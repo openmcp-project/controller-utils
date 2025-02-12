@@ -6,7 +6,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.tools.sap/CoLa/controller-utils/pkg/collections/iterators"
+	"github.com/openmcp-project/controller-utils/pkg/collections/iterators"
 )
 
 type linkedDummy struct {

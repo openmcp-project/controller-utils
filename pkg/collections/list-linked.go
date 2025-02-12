@@ -1,8 +1,8 @@
 package collections
 
 import (
-	cerr "github.tools.sap/CoLa/controller-utils/pkg/collections/errors"
-	"github.tools.sap/CoLa/controller-utils/pkg/collections/iterators"
+	cerr "github.com/openmcp-project/controller-utils/pkg/collections/errors"
+	"github.com/openmcp-project/controller-utils/pkg/collections/iterators"
 )
 
 var _ List[any] = &LinkedList[any]{}

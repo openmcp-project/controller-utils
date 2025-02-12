@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.tools.sap/CoLa/controller-utils/pkg/collections/iterators"
+	"github.com/openmcp-project/controller-utils/pkg/collections/iterators"
 )
 
 // Collection represents a collection of elements.

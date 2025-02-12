@@ -3,7 +3,7 @@ package collections
 import (
 	"encoding/json"
 
-	cerr "github.tools.sap/CoLa/controller-utils/pkg/collections/errors"
+	cerr "github.com/openmcp-project/controller-utils/pkg/collections/errors"
 )
 
 var _ List[any] = &abstractList[any]{}

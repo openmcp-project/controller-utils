@@ -102,13 +102,35 @@ localbin:
 
 .PHONY: goimports
 goimports: localbin ## Download goimports locally if necessary. If wrong version is installed, it will be overwritten.
-	@test -s $(FORMATTER) && test -s $(LOCALBIN)/goimports_version && cat $(LOCALBIN)/goimports_version | grep -q $(FORMATTER_VERSION) || \
+	@test -s $(FORMATTER) && test -s ./hack/goimports_version && cat ./hack/goimports_version | grep -q $(FORMATTER_VERSION) || \
 	( echo "Installing goimports $(FORMATTER_VERSION) ..."; \
 	GOBIN=$(LOCALBIN) go install golang.org/x/tools/cmd/goimports@$(FORMATTER_VERSION) && \
-	echo $(FORMATTER_VERSION) > $(LOCALBIN)/goimports_version )
+	echo $(FORMATTER_VERSION) > ./hack/goimports_version )
 
 .PHONY: golangci-lint
 golangci-lint: localbin ## Download golangci-lint locally if necessary. If wrong version is installed, it will be overwritten.
 	@test -s $(LINTER) && $(LINTER) --version | grep -q $(LINTER_VERSION) || \
 	( echo "Installing golangci-lint $(LINTER_VERSION) ..."; \
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(LOCALBIN) v$(LINTER_VERSION) )
+
+
+
+
+
+## Location to install dependencies to
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
+
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+CONTROLLER_TOOLS_VERSION ?= v0.15.0
+
+.PHONY: generate
+generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+
+.PHONY: controller-gen
+controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.
+$(CONTROLLER_GEN): $(LOCALBIN)
+	test -s $(LOCALBIN)/controller-gen && $(LOCALBIN)/controller-gen --version | grep -q $(CONTROLLER_TOOLS_VERSION) || \
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)

@@ -1,6 +1,6 @@
 package filters
 
-import "github.tools.sap/CoLa/controller-utils/pkg/collections"
+import "github.com/openmcp-project/controller-utils/pkg/collections"
 
 type Filter func(args ...any) bool
 

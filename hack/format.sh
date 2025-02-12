@@ -16,7 +16,7 @@ if [[ ${1:-} == "--verify" ]]; then
   shift
 fi
 
-tmp=$("${FORMATTER}" -l $write_mode -local=github.tools.sap/CoLa/controller-utils $("$PROJECT_ROOT/hack/unfold.sh" --clean --no-unfold "$@"))
+tmp=$("${FORMATTER}" -l $write_mode -local=github.com/openmcp-project/controller-utils $("$PROJECT_ROOT/hack/unfold.sh" --clean --no-unfold "$@"))
 
 if [[ -z ${write_mode} ]] && [[ ${tmp} ]]; then
   echo "unformatted files detected, please run 'make format'" 1>&2

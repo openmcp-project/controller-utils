@@ -4,8 +4,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.tools.sap/CoLa/controller-utils/pkg/collections"
-	cerr "github.tools.sap/CoLa/controller-utils/pkg/collections/errors"
+	"github.com/openmcp-project/controller-utils/pkg/collections"
+	cerr "github.com/openmcp-project/controller-utils/pkg/collections/errors"
 )
 
 type queueImplementation struct {
