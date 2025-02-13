@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.tools.sap/cloud-orchestration/controller-utils/api"
+	"github.com/openmcp-project/controller-utils/api"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"

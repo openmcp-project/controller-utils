@@ -10,7 +10,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
-	ctrlutils "github.tools.sap/CoLa/controller-utils/pkg/controller"
+	ctrlutils "github.com/openmcp-project/controller-utils/pkg/controller"
 )
 
 var _ = Describe("Predicates", func() {

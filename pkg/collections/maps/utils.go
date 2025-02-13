@@ -1,6 +1,6 @@
 package maps
 
-import "github.tools.sap/CoLa/controller-utils/pkg/collections/filters"
+import "github.com/openmcp-project/controller-utils/pkg/collections/filters"
 
 // Filter filters a map by applying a filter function to each key-value pair.
 // Only the entries for which the filter function returns true are kept in the copy.

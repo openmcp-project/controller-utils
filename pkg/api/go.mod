@@ -1,4 +1,4 @@
-module github.tools.sap/cloud-orchestration/controller-utils/api
+module github.com/openmcp-project/controller-utils/api
 
 go 1.21
 

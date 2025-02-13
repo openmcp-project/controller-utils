@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/openmcp-project/controller-utils/api"
 	"github.com/stretchr/testify/assert"
-	"github.tools.sap/cloud-orchestration/controller-utils/api"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"

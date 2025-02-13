@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
-	ctrlutils "github.tools.sap/CoLa/controller-utils/pkg/controller"
+	ctrlutils "github.com/openmcp-project/controller-utils/pkg/controller"
 )
 
 var _ = Describe("Owners", func() {

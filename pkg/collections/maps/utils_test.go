@@ -4,7 +4,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.tools.sap/CoLa/controller-utils/pkg/collections/maps"
+	"github.com/openmcp-project/controller-utils/pkg/collections/maps"
 )
 
 var _ = Describe("LinkedIterator Tests", func() {

@@ -1,4 +1,4 @@
-module github.tools.sap/CoLa/controller-utils
+module github.com/openmcp-project/controller-utils
 
 go 1.22.0
 
@@ -8,9 +8,9 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
+	github.com/openmcp-project/controller-utils/api v0.0.3
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
-	github.tools.sap/cloud-orchestration/controller-utils/api v0.0.3
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e
 	gopkg.in/yaml.v3 v3.0.1
@@ -77,3 +77,5 @@ require (
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
+
+replace github.com/openmcp-project/controller-utils/api => ./pkg/api

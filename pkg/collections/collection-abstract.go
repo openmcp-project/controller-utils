@@ -3,7 +3,7 @@ package collections
 import (
 	"fmt"
 
-	"github.tools.sap/CoLa/controller-utils/pkg/collections/iterators"
+	"github.com/openmcp-project/controller-utils/pkg/collections/iterators"
 )
 
 var _ Collection[any] = &abstractCollection[any]{}
