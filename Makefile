@@ -102,10 +102,10 @@ localbin:
 
 .PHONY: goimports
 goimports: localbin ## Download goimports locally if necessary. If wrong version is installed, it will be overwritten.
-	@test -s $(FORMATTER) && test -s $(LOCALBIN)/goimports_version && cat $(LOCALBIN)/goimports_version | grep -q $(FORMATTER_VERSION) || \
+	@test -s $(FORMATTER) && test -s ./hack/goimports_version && cat ./hack/goimports_version | grep -q $(FORMATTER_VERSION) || \
 	( echo "Installing goimports $(FORMATTER_VERSION) ..."; \
 	GOBIN=$(LOCALBIN) go install golang.org/x/tools/cmd/goimports@$(FORMATTER_VERSION) && \
-	echo $(FORMATTER_VERSION) > $(LOCALBIN)/goimports_version )
+	echo $(FORMATTER_VERSION) > ./hack/goimports_version )
 
 .PHONY: golangci-lint
 golangci-lint: localbin ## Download golangci-lint locally if necessary. If wrong version is installed, it will be overwritten.
