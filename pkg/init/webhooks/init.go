@@ -99,16 +99,14 @@ func Install(
 	}
 
 	for _, o := range apiTypes {
-		_, isValidator := o.(webhook.Validator)
 		_, isCustomValidator := o.(webhook.CustomValidator)
-		if isValidator || isCustomValidator {
+		if isCustomValidator {
 			if err := applyValidatingWebhook(ctx, opts, o); err != nil {
 				return err
 			}
 		}
-		_, isDefaulter := o.(webhook.Defaulter)
 		_, isCustomDefaulter := o.(webhook.CustomDefaulter)
-		if isDefaulter || isCustomDefaulter {
+		if isCustomDefaulter {
 			if err := applyMutatingWebhook(ctx, opts, o); err != nil {
 				return err
 			}

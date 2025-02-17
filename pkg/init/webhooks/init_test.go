@@ -286,8 +286,8 @@ var (
 )
 
 var _ client.Object = &TestObj{}
-var _ webhook.Validator = &TestObj{}
-var _ webhook.Defaulter = &TestObj{}
+var _ webhook.CustomValidator = &TestObj{}
+var _ webhook.CustomDefaulter = &TestObj{}
 
 type TestObj struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -295,22 +295,22 @@ type TestObj struct {
 }
 
 // Default implements admission.Defaulter.
-func (*TestObj) Default() {
+func (*TestObj) Default(_ context.Context, _ runtime.Object) error {
 	panic("unimplemented")
 }
 
 // ValidateCreate implements admission.Validator.
-func (*TestObj) ValidateCreate() (warnings admission.Warnings, err error) {
+func (*TestObj) ValidateCreate(_ context.Context, _ runtime.Object) (warnings admission.Warnings, err error) {
 	panic("unimplemented")
 }
 
 // ValidateDelete implements admission.Validator.
-func (*TestObj) ValidateDelete() (warnings admission.Warnings, err error) {
+func (*TestObj) ValidateDelete(_ context.Context, _ runtime.Object) (warnings admission.Warnings, err error) {
 	panic("unimplemented")
 }
 
 // ValidateUpdate implements admission.Validator.
-func (*TestObj) ValidateUpdate(old runtime.Object) (warnings admission.Warnings, err error) {
+func (*TestObj) ValidateUpdate(_ context.Context, _ runtime.Object, _ runtime.Object) (warnings admission.Warnings, err error) {
 	panic("unimplemented")
 }
 
