@@ -1,0 +1,66 @@
+name: release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  version_check:
+    name: Release version
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Read and validate VERSION
+        id: version
+        run: |
+          VERSION=$(cat VERSION)
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version format in VERSION file: $VERSION"
+            exit 1
+          fi
+          echo "New version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_ENV
+
+      - name: Check if VERSION is already tagged
+        id: check_tag
+        run: |
+          if git rev-parse "refs/tags/${{ env.version }}" >/dev/null 2>&1; then
+            echo "Tag ${{ env.version }} already exists. Skipping release."
+            exit 0
+          fi
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Prepare the release
+        run: |
+          make prepare-release
+          git diff --exit-code
+
+      - name: Create Git tag
+        run: |
+          AUTHOR_NAME=$(git log -1 --pretty=format:'%an')
+          AUTHOR_EMAIL=$(git log -1 --pretty=format:'%ae')
+          echo "Tagging as $AUTHOR_NAME <$AUTHOR_EMAIL>"
+
+          git config user.name "$AUTHOR_NAME"
+          git config user.email "$AUTHOR_EMAIL"
+
+          git tag -a "${{ env.version }}" -m "Release ${{ env.version }}"
+          git push origin "${{ env.version }}"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.version }}
+          name: Release ${{ env.version }}
+          body: "Automated release for version ${{ env.version }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
