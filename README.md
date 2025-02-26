@@ -4,7 +4,7 @@
 
 ## About this project
 
-This repository contains the controller-utils library which provides utility functions for cloud-orchestration projects. It also contains multiple functions and helper structs which are useful for developing k8s controllers and have been found to be copied around from one controller repository to another.
+This repository contains the controller-utils library which provides utility functions for Open Managed Control Planes projects. It also contains multiple functions and helper structs which are useful for developing k8s controllers and have been found to be copied around from one controller repository to another.
 
 ## Requirements and Setup
 
