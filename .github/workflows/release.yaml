@@ -8,12 +8,14 @@ permissions:
   contents: write # we need this to be able to push tags
 
 jobs:
-  version_check:
+  release_tag:
     name: Release version
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.PUSH_KEY }}
 
       - name: Read and validate VERSION
         id: version
