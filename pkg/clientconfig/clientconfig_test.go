@@ -10,7 +10,7 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/openmcp-project/controller-utils/api"
+	"github.com/openmcp-project/controller-utils/pkg/api"
 )
 
 type test_input struct {
