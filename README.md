@@ -9,7 +9,7 @@ This repository contains the controller-utils library which provides utility fun
 ## Requirements and Setup
 
 ```bash
-$ go get  github.com/openmcp-project/controller-utils@latest
+$ go get github.com/openmcp-project/controller-utils@latest
 ```
 
 
@@ -21,7 +21,7 @@ The `pkg/clientconfig` package provides helper functions for creating Kubernetes
 
 #### Noteworthy Functions
 
-- `GetRESTConfig` generates a `*rest.Config` for interacting with the Kubernetes API. It supports using a kubeconfig string, a kubeconfig file path, a secret reference that contains a kubeconfig file or a Service Account. 
+- `GetRESTConfig` generates a `*rest.Config` for interacting with the Kubernetes API. It supports using a kubeconfig string, a kubeconfig file path, a secret reference that contains a kubeconfig file or a Service Account.
 - `GetClient` creates a client.Client for managing Kubernetes resources.
 
 ### Webhooks
