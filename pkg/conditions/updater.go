@@ -15,6 +15,7 @@ type conditionUpdater[T comparable] struct {
 	conditions  map[string]Condition[T]
 	updated     sets.Set[string]
 	constructor func() Condition[T]
+	changed     bool
 }
 
 // ConditionUpdater creates a builder-like helper struct for updating a list of Conditions.
@@ -34,6 +35,7 @@ func ConditionUpdater[T comparable](constructor func() Condition[T], conditions 
 		Now:         time.Now(),
 		conditions:  make(map[string]Condition[T], len(conditions)),
 		constructor: constructor,
+		changed:     false,
 	}
 	for _, con := range conditions {
 		res.conditions[con.GetType()] = con
@@ -59,6 +61,13 @@ func (c *conditionUpdater[T]) UpdateCondition(conType string, status T, reason, 
 		// update LastTransitionTime only if status changed
 		con.SetLastTransitionTime(old.GetLastTransitionTime())
 	}
+	if !c.changed {
+		if ok {
+			c.changed = old.GetStatus() != con.GetStatus() || old.GetReason() != con.GetReason() || old.GetMessage() != con.GetMessage()
+		} else {
+			c.changed = true
+		}
+	}
 	c.conditions[conType] = con
 	if c.updated != nil {
 		c.updated.Insert(conType)
@@ -77,19 +86,38 @@ func (c *conditionUpdater[T]) HasCondition(conType string) bool {
 	return ok && (c.updated == nil || c.updated.Has(conType))
 }
 
+// RemoveCondition removes the condition with the given type from the updated condition list.
+func (c *conditionUpdater[T]) RemoveCondition(conType string) *conditionUpdater[T] {
+	if !c.HasCondition(conType) {
+		return c
+	}
+	delete(c.conditions, conType)
+	if c.updated != nil {
+		c.updated.Delete(conType)
+	}
+	c.changed = true
+	return c
+}
+
 // Conditions returns the updated condition list.
 // If the condition updater was initialized with removeUntouched=true, this list will only contain the conditions which have been updated
 // in between the condition updater creation and this method call. Otherwise, it will potentially also contain old conditions.
 // The conditions are returned sorted by their type.
-func (c *conditionUpdater[T]) Conditions() []Condition[T] {
+func (c *conditionUpdater[T]) Conditions() ([]Condition[T], bool) {
 	res := make([]Condition[T], 0, len(c.conditions))
 	for _, con := range c.conditions {
-		if c.updated == nil || c.updated.Has(con.GetType()) {
+		if c.updated == nil {
 			res = append(res, con)
+			continue
+		}
+		if c.updated.Has(con.GetType()) {
+			res = append(res, con)
+		} else {
+			c.changed = true
 		}
 	}
 	slices.SortStableFunc(res, func(a, b Condition[T]) int {
 		return strings.Compare(a.GetType(), b.GetType())
 	})
-	return res
+	return res, c.changed
 }

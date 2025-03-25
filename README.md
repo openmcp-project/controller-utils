@@ -75,13 +75,14 @@ updater.UpdateCondition("myCondition", true, "newReason", "newMessage")
 ```
 
 If all conditions are updated, use the `Conditions` method to generate the new list of conditions. The originally passed in list of conditions is not modified by the updater.
+The second return value is `true` if the updated list of conditions differs from the original one.
 ```go
-updatedCons := updater.Conditions()
+updatedCons, changed := updater.Conditions()
 ```
 
 For simplicity, all commands can be chained:
 ```go
-updatedCons := conditions.ConditionUpdater(func() conditions.Condition[bool] { return &conImpl{} }, oldCons, false).UpdateCondition("myCondition", true, "newReason", "newMessage").Conditions()
+updatedCons, changed := conditions.ConditionUpdater(func() conditions.Condition[bool] { return &conImpl{} }, oldCons, false).UpdateCondition("myCondition", true, "newReason", "newMessage").Conditions()
 ```
 
 ### controller
