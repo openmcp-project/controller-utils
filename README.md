@@ -41,6 +41,49 @@ The `pkg/collections` package contains multiple interfaces for collections, mode
 
 The package also contains further packages that contain some auxiliary functions for working with slices and maps in golang, e.g. for filtering.
 
+### conditions
+
+The `pkg/conditions` package helps with managing condition lists.
+
+The managed condition implementation must satisfy the `Condition[T comparable]` interface:
+```go
+type Condition[T comparable] interface {
+	GetType() string
+	SetType(conType string)
+	GetStatus() T
+	SetStatus(status T)
+	GetLastTransitionTime() time.Time
+	SetLastTransitionTime(timestamp time.Time)
+	GetReason() string
+	SetReason(reason string)
+	GetMessage() string
+	SetMessage(message string)
+}
+```
+
+To manage conditions, use the `ConditionUpdater` function and pass in a constructor function for your condition implementation and the old list of conditions. The bool argument determines whether old conditions that are not updated remain in the returned list (`false`) or are removed, so that the returned list contains only the conditions that were touched (`true`).
+
+```go
+updater := conditions.ConditionUpdater(func() conditions.Condition[bool] { return &conImpl{} }, oldCons, false)
+```
+
+Note that the `ConditionUpdater` stores the current time upon initialization and will set each updated condition's timestamp to this value, if the status of that condition changed as a result of the update. To use a different timestamp, manually overwrite the `Now` field of the updater.
+
+Use `UpdateCondition` or `UpdateConditionFromTemplate` to update a condition:
+```go
+updater.UpdateCondition("myCondition", true, "newReason", "newMessage")
+```
+
+If all conditions are updated, use the `Conditions` method to generate the new list of conditions. The originally passed in list of conditions is not modified by the updater.
+```go
+updatedCons := updater.Conditions()
+```
+
+For simplicity, all commands can be chained:
+```go
+updatedCons := conditions.ConditionUpdater(func() conditions.Condition[bool] { return &conImpl{} }, oldCons, false).UpdateCondition("myCondition", true, "newReason", "newMessage").Conditions()
+```
+
 ### controller
 
 The `pkg/controller` package contains useful functions for setting up and running k8s controllers.
@@ -50,7 +93,6 @@ The `pkg/controller` package contains useful functions for setting up and runnin
 - `LoadKubeconfig` creates a REST config for accessing a k8s cluster. It can be used with a path to a kubeconfig file, or a directory containing files for a trust relationship. When called with an empty path, it returns the in-cluster configuration.
 
 ### logging
-
 
 This package contains the logging library from the [Landscaper controller-utils module](https://github.com/gardener/landscaper/tree/master/controller-utils/pkg/logging).
 
