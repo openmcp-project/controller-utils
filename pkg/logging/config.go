@@ -23,15 +23,15 @@ func InitFlags(flagset *flag.FlagSet) {
 	}
 	fs := flag.NewFlagSet("log", flag.ExitOnError)
 
-	fs.BoolVar(&configFromFlags.Development, "dev", false, "enable development logging")
-	fs.BoolVar(&configFromFlags.Cli, "cli", false, "use CLI formatting for logs (color, no timestamps)")
-	f := fs.VarPF(&configFromFlags.Format, "format", "f", "logging format [text, json]")
+	fs.BoolVar(&configFromFlags.Development, "dev", false, "Enable development logging.")
+	fs.BoolVar(&configFromFlags.Cli, "cli", false, "Use CLI formatting for logs (color, no timestamps).")
+	f := fs.VarPF(&configFromFlags.Format, "format", "f", "Logging format [text, json].")
 	f.DefValue = "text if either dev or cli flag is set, json otherwise"
-	f = fs.VarPF(&configFromFlags.Level, "verbosity", "v", "logging verbosity [error, info, debug]")
+	f = fs.VarPF(&configFromFlags.Level, "verbosity", "v", "Logging verbosity [error, info, debug].")
 	f.DefValue = "info, or debug if dev flag is set"
-	fs.BoolVar(&configFromFlags.DisableStacktrace, "disable-stacktrace", true, "disable the stacktrace of error logs")
-	fs.BoolVar(&configFromFlags.DisableCaller, "disable-caller", true, "disable the caller of logs")
-	fs.BoolVar(&configFromFlags.DisableTimestamp, "disable-timestamp", false, "disable timestamp output")
+	fs.BoolVar(&configFromFlags.DisableStacktrace, "disable-stacktrace", true, "Disable the stacktrace of error logs.")
+	fs.BoolVar(&configFromFlags.DisableCaller, "disable-caller", true, "Disable the caller of logs.")
+	fs.BoolVar(&configFromFlags.DisableTimestamp, "disable-timestamp", false, "Disable timestamp output.")
 
 	configFromFlags.flagset = fs
 	flagset.AddFlagSet(configFromFlags.flagset)
