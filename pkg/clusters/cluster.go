@@ -3,12 +3,13 @@ package clusters
 import (
 	"fmt"
 
-	"github.com/openmcp-project/controller-utils/pkg/controller"
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
+
+	"github.com/openmcp-project/controller-utils/pkg/controller"
 )
 
 type Cluster struct {
