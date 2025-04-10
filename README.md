@@ -41,6 +41,17 @@ The `pkg/collections` package contains multiple interfaces for collections, mode
 
 The package also contains further packages that contain some auxiliary functions for working with slices and maps in golang, e.g. for filtering.
 
+## clusters
+
+The `pkg/clusters` package helps with loading kubeconfigs and creating clients for multiple clusters.
+```go
+foo := clusters.New("foo") // initializes a new cluster with id 'foo'
+foo.RegisterConfigPathFlag(cmd.Flags()) // adds a '--foo-cluster' flag to the flag set for passing in a kubeconfig path
+foo.InitializeRESTConfig() // loads the kubeconfig using the 'LoadKubeconfig' function from the 'controller' package
+foo.InitializeClient(myScheme) // initializes the 'Client' and 'Cluster' interfaces from the controller-runtime
+```
+You can then use the different getter methods for working with the cluster.
+
 ### conditions
 
 The `pkg/conditions` package helps with managing condition lists.
