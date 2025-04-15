@@ -152,23 +152,10 @@ type StatusChangedPredicate struct {
 }
 
 func (p StatusChangedPredicate) Update(e event.UpdateEvent) bool {
-	oldStatus := getStatus(e.ObjectOld)
-	newStatus := getStatus(e.ObjectNew)
+	oldStatus := GetField(e.ObjectOld, "Status", false)
+	newStatus := GetField(e.ObjectNew, "Status", false)
 	if oldStatus == nil || newStatus == nil {
 		return true
 	}
 	return !reflect.DeepEqual(oldStatus, newStatus)
-}
-
-func getStatus(obj any) any {
-	if obj == nil {
-		return nil
-	}
-	val := reflect.ValueOf(obj).Elem()
-	for i := 0; i < val.NumField(); i++ {
-		if val.Type().Field(i).Name == "Status" {
-			return val.Field(i).Interface()
-		}
-	}
-	return nil
 }
