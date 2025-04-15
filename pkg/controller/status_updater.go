@@ -74,10 +74,14 @@ func (b *StatusUpdaterBuilder[Obj, PhType, ConType]) WithNestedStruct(name strin
 	return b
 }
 
-// WithoutField removes the field from the status update.
-// This is an alias for WithFieldOverride(field, "").
-func (b *StatusUpdaterBuilder[Obj, PhType, ConType]) WithoutField(field StatusField) *StatusUpdaterBuilder[Obj, PhType, ConType] {
-	return b.WithFieldOverride(field, "")
+// WithoutFields removes the specified fields from the status update.
+// It basically calls WithFieldOverride(field, "") for each field.
+// This can be used in combination with AllStatusFields() to disable all fields.
+func (b *StatusUpdaterBuilder[Obj, PhType, ConType]) WithoutFields(fields ...StatusField) *StatusUpdaterBuilder[Obj, PhType, ConType] {
+	for _, field := range fields {
+		b.WithFieldOverride(field, "")
+	}
+	return b
 }
 
 // WithConditionUpdater must be called if the conditions should be updated, because this requires some additional information.
