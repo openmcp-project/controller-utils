@@ -172,12 +172,12 @@ func defaultPhaseUpdateFunc[Obj client.Object, PhType ~string, ConType comparabl
 // UpdateStatus updates the status of the object in the given ReconcileResult, using the previously set field names and functions.
 // The object is expected to be a pointer to a struct with the status field.
 // If the 'Object' field in the ReconcileResult is nil, the status update becomes a no-op.
-func (s *statusUpdater[Obj, PhType, ConType]) UpdateStatus(ctx context.Context, c client.Client, rr ReconcileResult[Obj, ConType]) error {
+func (s *statusUpdater[Obj, PhType, ConType]) UpdateStatus(ctx context.Context, c client.Client, rr ReconcileResult[Obj, ConType]) (ctrl.Result, error) {
 	if IsNil(rr.Object) {
-		return nil
+		return rr.Result, nil
 	}
 	if s.fieldNames[STATUS_FIELD] == "" {
-		return nil
+		return rr.Result, nil
 	}
 	if IsNil(rr.OldObject) || IsSameObject(rr.OldObject, rr.Object) {
 		// create old object based on given one
@@ -185,9 +185,10 @@ func (s *statusUpdater[Obj, PhType, ConType]) UpdateStatus(ctx context.Context, 
 	}
 	status := GetField(rr.Object, s.fieldNames[STATUS_FIELD], true)
 	if IsNil(status) {
-		return fmt.Errorf("unable to get pointer to status field '%s' of object %T", s.fieldNames[STATUS_FIELD], rr.Object)
+		return rr.Result, fmt.Errorf("unable to get pointer to status field '%s' of object %T", s.fieldNames[STATUS_FIELD], rr.Object)
 	}
 
+	errs := errors.NewReasonableErrorList(rr.ReconcileError)
 	now := time.Now()
 	if s.fieldNames[STATUS_FIELD_LAST_RECONCILE_TIME] != "" {
 		SetField(status, s.fieldNames[STATUS_FIELD_LAST_RECONCILE_TIME], metav1.NewTime(now))
@@ -232,21 +233,23 @@ func (s *statusUpdater[Obj, PhType, ConType]) UpdateStatus(ctx context.Context, 
 	if s.fieldNames[STATUS_FIELD_PHASE] != "" {
 		phase, err := s.phaseUpdateFunc(rr.Object, rr)
 		if err != nil {
-			return fmt.Errorf("error computing phase: %w", err)
+			phase, _ = defaultPhaseUpdateFunc[Obj, PhType, ConType](rr.Object, rr)
+			errs.Append(fmt.Errorf("error computing phase: %w", err))
 		}
 		SetField(status, s.fieldNames[STATUS_FIELD_PHASE], phase)
 	}
 	if s.customUpdateFunc != nil {
 		if err := s.customUpdateFunc(rr.Object, rr); err != nil {
-			return fmt.Errorf("error performing custom status update: %w", err)
+			errs.Append(fmt.Errorf("error performing custom status update: %w", err))
 		}
 	}
 
 	// update status in cluster
 	if err := c.Status().Patch(ctx, rr.Object, client.MergeFrom(rr.OldObject)); err != nil {
-		return fmt.Errorf("error patching status: %w", err)
+		errs.Append(fmt.Errorf("error patching status: %w", err))
 	}
-	return nil
+
+	return rr.Result, errs.Aggregate()
 }
 
 // GetField returns the value of the field with the given name from the given object.

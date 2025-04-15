@@ -36,7 +36,10 @@ var _ = Describe("Status Updater", func() {
 		}
 		su := preconfiguredStatusUpdaterBuilder().Build()
 		now := time.Now()
-		Expect(su.UpdateStatus(env.Ctx, env.Client(), rr)).To(Succeed())
+		res, err := su.UpdateStatus(env.Ctx, env.Client(), rr)
+		Expect(res).To(Equal(rr.Result))
+		Expect(err).To(HaveOccurred())
+		Expect(err).To(MatchError(rr.ReconcileError))
 		Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(obj), obj)).To(Succeed())
 
 		Expect(obj.Status.Phase).To(Equal(PhaseFailed))
