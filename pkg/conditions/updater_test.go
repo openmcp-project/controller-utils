@@ -7,76 +7,17 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	. "github.com/openmcp-project/controller-utils/pkg/testing/matchers"
 
 	"github.com/openmcp-project/controller-utils/pkg/conditions"
 )
 
-type conImpl struct {
-	status             bool
-	conType            string
-	reason             string
-	message            string
-	lastTransitionTime time.Time
-}
-
-func newConImplWithValues(conType string, status bool, reason, message string, lastTransitionTime time.Time) *conImpl {
-	return &conImpl{
-		conType:            conType,
-		status:             status,
-		reason:             reason,
-		message:            message,
-		lastTransitionTime: lastTransitionTime,
-	}
-}
-
-var _ conditions.Condition[bool] = &conImpl{}
-
-func (c *conImpl) GetLastTransitionTime() time.Time {
-	return c.lastTransitionTime
-}
-
-func (c *conImpl) GetType() string {
-	return c.conType
-}
-
-func (c *conImpl) GetStatus() bool {
-	return c.status
-}
-
-func (c *conImpl) GetReason() string {
-	return c.reason
-}
-
-func (c *conImpl) GetMessage() string {
-	return c.message
-}
-
-func (c *conImpl) SetStatus(status bool) {
-	c.status = status
-}
-
-func (c *conImpl) SetType(conType string) {
-	c.conType = conType
-}
-
-func (c *conImpl) SetLastTransitionTime(timestamp time.Time) {
-	c.lastTransitionTime = timestamp
-}
-
-func (c *conImpl) SetReason(reason string) {
-	c.reason = reason
-}
-
-func (c *conImpl) SetMessage(message string) {
-	c.message = message
-}
-
 func testConditionSet() []conditions.Condition[bool] {
 	now := time.Now().Add((-24) * time.Hour)
 	return []conditions.Condition[bool]{
-		newConImplWithValues("true", true, "reason", "message", now),
-		newConImplWithValues("false", false, "reason", "message", now),
-		newConImplWithValues("alsoTrue", true, "alsoReason", "alsoMessage", now),
+		NewConditionImplFromValues("true", true, "reason", "message", now),
+		NewConditionImplFromValues("false", false, "reason", "message", now),
+		NewConditionImplFromValues("alsoTrue", true, "alsoReason", "alsoMessage", now),
 	}
 }
 
@@ -134,7 +75,7 @@ var _ = Describe("Conditions", func() {
 		It("should update the condition (same value, keep other cons)", func() {
 			cons := testConditionSet()
 			oldCon := conditions.GetCondition(cons, "true")
-			updated, changed := conditions.ConditionUpdater(func() conditions.Condition[bool] { return &conImpl{} }, cons, false).UpdateCondition(oldCon.GetType(), oldCon.GetStatus(), "newReason", "newMessage").Conditions()
+			updated, changed := conditions.ConditionUpdater(NewCondition[bool], cons, false).UpdateCondition(oldCon.GetType(), oldCon.GetStatus(), "newReason", "newMessage").Conditions()
 			Expect(changed).To(BeTrue())
 			newCon := conditions.GetCondition(updated, "true")
 			Expect(updated).To(HaveLen(len(cons)))
@@ -151,7 +92,7 @@ var _ = Describe("Conditions", func() {
 		It("should update the condition (different value, keep other cons)", func() {
 			cons := testConditionSet()
 			oldCon := conditions.GetCondition(cons, "true")
-			updated, changed := conditions.ConditionUpdater(func() conditions.Condition[bool] { return &conImpl{} }, cons, false).UpdateCondition(oldCon.GetType(), !oldCon.GetStatus(), "newReason", "newMessage").Conditions()
+			updated, changed := conditions.ConditionUpdater(NewCondition[bool], cons, false).UpdateCondition(oldCon.GetType(), !oldCon.GetStatus(), "newReason", "newMessage").Conditions()
 			Expect(changed).To(BeTrue())
 			newCon := conditions.GetCondition(updated, "true")
 			Expect(updated).To(HaveLen(len(cons)))
@@ -169,7 +110,7 @@ var _ = Describe("Conditions", func() {
 		It("should update the condition (same value, discard other cons)", func() {
 			cons := testConditionSet()
 			oldCon := conditions.GetCondition(cons, "true")
-			updated, changed := conditions.ConditionUpdater(func() conditions.Condition[bool] { return &conImpl{} }, cons, true).UpdateCondition(oldCon.GetType(), oldCon.GetStatus(), "newReason", "newMessage").Conditions()
+			updated, changed := conditions.ConditionUpdater(NewCondition[bool], cons, true).UpdateCondition(oldCon.GetType(), oldCon.GetStatus(), "newReason", "newMessage").Conditions()
 			Expect(changed).To(BeTrue())
 			newCon := conditions.GetCondition(updated, "true")
 			Expect(updated).To(HaveLen(1))
@@ -186,7 +127,7 @@ var _ = Describe("Conditions", func() {
 		It("should update the condition (different value, discard other cons)", func() {
 			cons := testConditionSet()
 			oldCon := conditions.GetCondition(cons, "true")
-			updated, changed := conditions.ConditionUpdater(func() conditions.Condition[bool] { return &conImpl{} }, cons, true).UpdateCondition(oldCon.GetType(), !oldCon.GetStatus(), "newReason", "newMessage").Conditions()
+			updated, changed := conditions.ConditionUpdater(NewCondition[bool], cons, true).UpdateCondition(oldCon.GetType(), !oldCon.GetStatus(), "newReason", "newMessage").Conditions()
 			Expect(changed).To(BeTrue())
 			newCon := conditions.GetCondition(updated, "true")
 			Expect(updated).To(HaveLen(1))
@@ -203,16 +144,16 @@ var _ = Describe("Conditions", func() {
 
 		It("should sort the conditions by type", func() {
 			cons := []conditions.Condition[bool]{
-				newConImplWithValues("c", true, "reason", "message", time.Now()),
-				newConImplWithValues("d", true, "reason", "message", time.Now()),
-				newConImplWithValues("a", true, "reason", "message", time.Now()),
-				newConImplWithValues("b", true, "reason", "message", time.Now()),
+				NewConditionImplFromValues("c", true, "reason", "message", time.Now()),
+				NewConditionImplFromValues("d", true, "reason", "message", time.Now()),
+				NewConditionImplFromValues("a", true, "reason", "message", time.Now()),
+				NewConditionImplFromValues("b", true, "reason", "message", time.Now()),
 			}
 			compareConditions := func(a, b conditions.Condition[bool]) int {
 				return strings.Compare(a.GetType(), b.GetType())
 			}
 			Expect(slices.IsSortedFunc(cons, compareConditions)).To(BeFalse(), "conditions in the test object are already sorted, unable to test sorting")
-			updated, changed := conditions.ConditionUpdater(func() conditions.Condition[bool] { return &conImpl{} }, cons, false).Conditions()
+			updated, changed := conditions.ConditionUpdater(NewCondition[bool], cons, false).Conditions()
 			Expect(changed).To(BeFalse())
 			Expect(len(updated)).To(BeNumerically(">", 1), "test object does not contain enough conditions to test sorting")
 			Expect(len(updated)).To(Equal(len(cons)))
@@ -221,14 +162,14 @@ var _ = Describe("Conditions", func() {
 
 		It("should remove a condition", func() {
 			cons := testConditionSet()
-			updated, changed := conditions.ConditionUpdater(func() conditions.Condition[bool] { return &conImpl{} }, cons, false).RemoveCondition("true").Conditions()
+			updated, changed := conditions.ConditionUpdater(NewCondition[bool], cons, false).RemoveCondition("true").Conditions()
 			Expect(changed).To(BeTrue())
 			Expect(updated).To(HaveLen(len(cons) - 1))
 			con := conditions.GetCondition(updated, "true")
 			Expect(con).To(BeNil())
 
 			// removing a condition that does not exist should not change anything
-			updated, changed = conditions.ConditionUpdater(func() conditions.Condition[bool] { return &conImpl{} }, cons, false).RemoveCondition("doesNotExist").Conditions()
+			updated, changed = conditions.ConditionUpdater(NewCondition[bool], cons, false).RemoveCondition("doesNotExist").Conditions()
 			Expect(changed).To(BeFalse())
 			Expect(updated).To(HaveLen(len(cons)))
 		})
@@ -236,17 +177,17 @@ var _ = Describe("Conditions", func() {
 		It("should not mark a condition as changed if it has the same values as before", func() {
 			cons := testConditionSet()
 			con := conditions.GetCondition(cons, "true")
-			updated, changed := conditions.ConditionUpdater(func() conditions.Condition[bool] { return &conImpl{} }, cons, false).UpdateCondition(con.GetType(), con.GetStatus(), con.GetReason(), con.GetMessage()).Conditions()
+			updated, changed := conditions.ConditionUpdater(NewCondition[bool], cons, false).UpdateCondition(con.GetType(), con.GetStatus(), con.GetReason(), con.GetMessage()).Conditions()
 			Expect(changed).To(BeFalse())
 			Expect(updated).To(HaveLen(len(cons)))
 		})
 
 		It("should return that a condition exists only if it will be contained in the returned list", func() {
 			cons := testConditionSet()
-			updater := conditions.ConditionUpdater(func() conditions.Condition[bool] { return &conImpl{} }, cons, false)
+			updater := conditions.ConditionUpdater(NewCondition[bool], cons, false)
 			Expect(updater.HasCondition("true")).To(BeTrue())
 			Expect(updater.HasCondition("doesNotExist")).To(BeFalse())
-			updater = conditions.ConditionUpdater(func() conditions.Condition[bool] { return &conImpl{} }, cons, true)
+			updater = conditions.ConditionUpdater(NewCondition[bool], cons, true)
 			Expect(updater.HasCondition("true")).To(BeFalse())
 			Expect(updater.HasCondition("doesNotExist")).To(BeFalse())
 			updater.UpdateCondition("true", true, "reason", "message")

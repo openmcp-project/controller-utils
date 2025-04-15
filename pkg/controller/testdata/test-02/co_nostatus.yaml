@@ -1,0 +1,6 @@
+apiVersion: testing.openmcp.cloud/v1alpha1
+kind: CustomObject
+metadata:
+  name: nostatus
+  namespace: default
+spec: {}

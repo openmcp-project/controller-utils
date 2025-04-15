@@ -11,11 +11,11 @@ import (
 // conditionUpdater is a helper struct for updating a list of Conditions.
 // Use the ConditionUpdater constructor for initializing.
 type conditionUpdater[T comparable] struct {
-	Now         time.Time
-	conditions  map[string]Condition[T]
-	updated     sets.Set[string]
-	constructor func() Condition[T]
-	changed     bool
+	Now        time.Time
+	conditions map[string]Condition[T]
+	updated    sets.Set[string]
+	construct  func() Condition[T]
+	changed    bool
 }
 
 // ConditionUpdater creates a builder-like helper struct for updating a list of Conditions.
@@ -30,12 +30,12 @@ type conditionUpdater[T comparable] struct {
 //
 // Usage example:
 // status.conditions = ConditionUpdater(status.conditions, true).UpdateCondition(...).UpdateCondition(...).Conditions()
-func ConditionUpdater[T comparable](constructor func() Condition[T], conditions []Condition[T], removeUntouched bool) *conditionUpdater[T] {
+func ConditionUpdater[T comparable](construct func() Condition[T], conditions []Condition[T], removeUntouched bool) *conditionUpdater[T] {
 	res := &conditionUpdater[T]{
-		Now:         time.Now(),
-		conditions:  make(map[string]Condition[T], len(conditions)),
-		constructor: constructor,
-		changed:     false,
+		Now:        time.Now(),
+		conditions: make(map[string]Condition[T], len(conditions)),
+		construct:  construct,
+		changed:    false,
 	}
 	for _, con := range conditions {
 		res.conditions[con.GetType()] = con
@@ -50,7 +50,7 @@ func ConditionUpdater[T comparable](constructor func() Condition[T], conditions 
 // All fields of the condition are updated with the values given in the arguments, but the condition's LastTransitionTime is only updated (with the timestamp contained in the receiver struct) if the status changed.
 // Returns the receiver for easy chaining.
 func (c *conditionUpdater[T]) UpdateCondition(conType string, status T, reason, message string) *conditionUpdater[T] {
-	con := c.constructor()
+	con := c.construct()
 	con.SetType(conType)
 	con.SetStatus(status)
 	con.SetReason(reason)
@@ -103,6 +103,7 @@ func (c *conditionUpdater[T]) RemoveCondition(conType string) *conditionUpdater[
 // If the condition updater was initialized with removeUntouched=true, this list will only contain the conditions which have been updated
 // in between the condition updater creation and this method call. Otherwise, it will potentially also contain old conditions.
 // The conditions are returned sorted by their type.
+// The second return value indicates whether the condition list has actually changed.
 func (c *conditionUpdater[T]) Conditions() ([]Condition[T], bool) {
 	res := make([]Condition[T], 0, len(c.conditions))
 	for _, con := range c.conditions {
