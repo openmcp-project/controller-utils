@@ -20,13 +20,32 @@ type conditionMatcher[T comparable] struct {
 	expected *ConditionImpl[T]
 }
 
+func (c *conditionMatcher[T]) GomegaString() string {
+	if c == nil || c.expected == nil {
+		return "<nil>"
+	}
+	return c.expected.String()
+}
+
 var _ types.GomegaMatcher = &conditionMatcher[bool]{}
 
 // Match implements types.GomegaMatcher.
-func (c *conditionMatcher[T]) Match(actualRaw interface{}) (success bool, err error) {
-	actual, ok := actualRaw.(conditions.Condition[T])
-	if !ok {
-		return false, fmt.Errorf("expected actual to be of type Condition[%s], got %T", reflect.TypeFor[T]().Name(), actualRaw)
+func (c *conditionMatcher[T]) Match(actualRaw any) (success bool, err error) {
+	actual, converted := actualRaw.(conditions.Condition[T])
+	if !converted {
+		// actualRaw doesn't implement conditions.Condition[T], check if a pointer to it does
+		ptrValue := reflect.New(reflect.TypeOf(actualRaw))
+		reflect.Indirect(ptrValue).Set(reflect.ValueOf(actualRaw))
+		actual, converted = ptrValue.Interface().(conditions.Condition[T])
+	}
+	if !converted {
+		return false, fmt.Errorf("expected actual (or &actual) to be of type Condition[%s], got %T", reflect.TypeFor[T]().Name(), actualRaw)
+	}
+	if actual == nil && c.expected == nil {
+		return true, nil
+	}
+	if actual == nil || c.expected == nil {
+		return false, nil
 	}
 	if c.expected.HasType() && c.expected.GetType() != actual.GetType() {
 		return false, nil
@@ -84,6 +103,39 @@ type ConditionImpl[T comparable] struct {
 	reason             *string
 	message            *string
 	lastTransitionTime *time.Time
+}
+
+func (c *ConditionImpl[T]) String() string {
+	if c == nil {
+		return "<nil>"
+	}
+	var status, conType, reason, message, lastTransitionTime string
+	if c.status == nil {
+		status = "<arbitrary>"
+	} else {
+		status = fmt.Sprintf("%v", *c.status)
+	}
+	if c.conType == nil {
+		conType = "<arbitrary>"
+	} else {
+		conType = *c.conType
+	}
+	if c.reason == nil {
+		reason = "<arbitrary>"
+	} else {
+		reason = *c.reason
+	}
+	if c.message == nil {
+		message = "<arbitrary>"
+	} else {
+		message = *c.message
+	}
+	if c.lastTransitionTime == nil {
+		lastTransitionTime = "<arbitrary>"
+	} else {
+		lastTransitionTime = c.lastTransitionTime.Format(time.RFC3339)
+	}
+	return fmt.Sprintf("Condition[%s]{\n\tType: %q,\n\tStatus: %s,\n\tReason: %q,\n\tMessage: %q,\n\tLastTransitionTime: %v,\n}", reflect.TypeFor[T]().Name(), conType, status, reason, message, lastTransitionTime)
 }
 
 var _ conditions.Condition[bool] = &ConditionImpl[bool]{}

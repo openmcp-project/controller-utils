@@ -227,10 +227,23 @@ func (s *statusUpdater[Obj, PhType, ConType]) UpdateStatus(ctx context.Context, 
 		}
 		newConsRaw, _ := cu.Conditions()
 		conType := reflect.TypeOf(s.conConstruct())
+		targetType := reflect.TypeOf(GetField(status, s.fieldNames[STATUS_FIELD_CONDITIONS], false))
+		depointerize := false
+		if !reflect.SliceOf(conType).AssignableTo(targetType) {
+			// this can happen if the constructor returns a *ConditionImplementation, which creates a []*ConditionImplementation below,
+			// but the condition list field is a []ConditionImplementation
+			if conType.Kind() == reflect.Ptr {
+				depointerize = true
+				conType = conType.Elem()
+			}
+		}
 		newCons := reflect.MakeSlice(reflect.SliceOf(conType), len(newConsRaw), len(newConsRaw)).Interface()
 		for i := range newConsRaw {
-			val := reflect.ValueOf(newConsRaw[i]).Convert(conType)
-			reflect.ValueOf(newCons).Index(i).Set(val)
+			val := reflect.ValueOf(newConsRaw[i])
+			if depointerize {
+				val = val.Elem()
+			}
+			reflect.ValueOf(newCons).Index(i).Set(val.Convert(conType))
 		}
 		SetField(status, s.fieldNames[STATUS_FIELD_CONDITIONS], newCons)
 	}
