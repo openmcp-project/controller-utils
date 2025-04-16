@@ -202,7 +202,7 @@ func (c *Condition) SetLastTransitionTime(t time.Time) {
 }
 
 // ConditionList is a list of Conditions.
-type ConditionList []*Condition
+type ConditionList []Condition
 
 type CommonStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration"`
@@ -237,11 +237,7 @@ func (in *CommonStatus) DeepCopyInto(out *CommonStatus) {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make(ConditionList, len(*in))
 		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(Condition)
-				(*in).DeepCopyInto(*out)
-			}
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 }
@@ -278,11 +274,7 @@ func (in ConditionList) DeepCopyInto(out *ConditionList) {
 		in := &in
 		*out = make(ConditionList, len(*in))
 		for i := range *in {
-			if (*in)[i] != nil {
-				in, out := &(*in)[i], &(*out)[i]
-				*out = new(Condition)
-				(*in).DeepCopyInto(*out)
-			}
+			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 }
