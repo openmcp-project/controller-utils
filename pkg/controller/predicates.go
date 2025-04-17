@@ -10,6 +10,47 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
+//////////////////
+/// CONVERSION ///
+//////////////////
+
+// ToTypedPredicate wraps a predicate.Predicate (which is an alias for predicate.TypedPredicate[client.Object]) into a predicate.TypedPredicate[Obj].
+func ToTypedPredicate[Obj client.Object](p predicate.Predicate) predicate.TypedPredicate[Obj] {
+	return &typedPredicateConverter[Obj]{internal: p}
+}
+
+type typedPredicateConverter[Obj client.Object] struct {
+	internal predicate.Predicate
+}
+
+var _ predicate.TypedPredicate[client.Object] = &typedPredicateConverter[client.Object]{}
+
+func (t *typedPredicateConverter[Obj]) Create(e event.TypedCreateEvent[Obj]) bool {
+	return t.internal.Create(event.TypedCreateEvent[client.Object]{
+		Object: e.Object,
+	})
+}
+
+func (t *typedPredicateConverter[Obj]) Delete(e event.TypedDeleteEvent[Obj]) bool {
+	return t.internal.Delete(event.TypedDeleteEvent[client.Object]{
+		Object:             e.Object,
+		DeleteStateUnknown: e.DeleteStateUnknown,
+	})
+}
+
+func (t *typedPredicateConverter[Obj]) Generic(e event.TypedGenericEvent[Obj]) bool {
+	return t.internal.Generic(event.TypedGenericEvent[client.Object]{
+		Object: e.Object,
+	})
+}
+
+func (t *typedPredicateConverter[Obj]) Update(e event.TypedUpdateEvent[Obj]) bool {
+	return t.internal.Update(event.TypedUpdateEvent[client.Object]{
+		ObjectOld: e.ObjectOld,
+		ObjectNew: e.ObjectNew,
+	})
+}
+
 /////////////////////////////////////
 /// DELETION TIMESTAMP PREDICATES ///
 /////////////////////////////////////

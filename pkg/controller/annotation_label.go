@@ -103,7 +103,6 @@ func EnsureLabel(ctx context.Context, c client.Client, obj client.Object, labelK
 }
 
 // ensureMetadataEntry is the common base method for EnsureAnnotation and EnsureLabel.
-// This is mainly exposed for testing purposes, usually it is statically known whether an annotation or label is to be modified and the respective method should be used.
 func ensureMetadataEntry(mType metadataEntryType, ctx context.Context, c client.Client, obj client.Object, key, value string, patch bool, mode ...ModifyMetadataEntryMode) error {
 	modeDelete := false
 	modeOverwrite := false
