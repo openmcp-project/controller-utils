@@ -40,6 +40,13 @@ func (c *Cluster) WithConfigPath(cfgPath string) *Cluster {
 	return c
 }
 
+// WithRestConfig allows to set the REST config manually.
+// Returns the cluster for chaining.
+func (c *Cluster) WithRESTConfig(cfg *rest.Config) *Cluster {
+	c.restCfg = cfg
+	return c
+}
+
 // RegisterConfigPathFlag adds a flag '--<id>-cluster' for the cluster's config path to the given flag set.
 // Panics if the cluster's id is not set.
 func (c *Cluster) RegisterConfigPathFlag(flags *flag.FlagSet) {
@@ -117,7 +124,7 @@ func (c *Cluster) InitializeClient(scheme *runtime.Scheme) error {
 	if err != nil {
 		return fmt.Errorf("failed to create '%s' cluster client: %w", c.ID(), err)
 	}
-	clu, err := cluster.New(c.restCfg, func(o *cluster.Options) { o.Scheme = scheme })
+	clu, err := cluster.New(c.restCfg, func(o *cluster.Options) { o.Scheme = scheme; o.Cache.Scheme = scheme })
 	if err != nil {
 		return fmt.Errorf("failed to create '%s' cluster Cluster representation: %w", c.ID(), err)
 	}

@@ -5,6 +5,8 @@ import (
 	"encoding/base32"
 	"reflect"
 	"strings"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -34,4 +36,18 @@ func IsNil(i any) bool {
 		return reflect.ValueOf(i).IsNil()
 	}
 	return false
+}
+
+// ObjectKey returns a client.ObjectKey for the given name and optionally namespace.
+// The first argument is the name of the object.
+// An optional second argument contains the namespace. All further arguments are ignored.
+func ObjectKey(name string, maybeNamespace ...string) client.ObjectKey {
+	namespace := ""
+	if len(maybeNamespace) > 0 {
+		namespace = maybeNamespace[0]
+	}
+	return client.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}
 }

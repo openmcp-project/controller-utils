@@ -71,20 +71,6 @@ func RequestFromStrings(name string, maybeNamespace ...string) reconcile.Request
 	}
 }
 
-// ObjectKey returns a client.ObjectKey for the given name and optionally namespace.
-// The first argument is the name of the object.
-// An optional second argument contains the namespace. All further arguments are ignored.
-func ObjectKey(name string, maybeNamespace ...string) client.ObjectKey {
-	namespace := ""
-	if len(maybeNamespace) > 0 {
-		namespace = maybeNamespace[0]
-	}
-	return client.ObjectKey{
-		Namespace: namespace,
-		Name:      name,
-	}
-}
-
 // LoadObject reads a file and unmarshals it into the given object.
 // obj must be a non-nil pointer.
 func LoadObject(obj any, paths ...string) error {
