@@ -7,6 +7,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	. "github.com/openmcp-project/controller-utils/pkg/testing/matchers"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +29,7 @@ var _ = Describe("Status Updater", func() {
 	It("should update an empty status", func() {
 		env := testutils.NewEnvironmentBuilder().WithFakeClient(coScheme).WithInitObjectPath("testdata", "test-02").WithDynamicObjectsWithStatus(&CustomObject{}).Build()
 		obj := &CustomObject{}
-		Expect(env.Client().Get(env.Ctx, testutils.ObjectKey("nostatus", "default"), obj)).To(Succeed())
+		Expect(env.Client().Get(env.Ctx, controller.ObjectKey("nostatus", "default"), obj)).To(Succeed())
 		rr := controller.ReconcileResult[*CustomObject, ConditionStatus]{
 			Object:         obj,
 			ReconcileError: errors.WithReason(fmt.Errorf("test error"), "TestError"),
@@ -61,6 +62,119 @@ var _ = Describe("Status Updater", func() {
 				WithMessage("TestMessageFalse").
 				WithLastTransitionTime(obj.Status.LastReconcileTime.Time)),
 		))
+	})
+
+	It("should update an existing status", func() {
+		env := testutils.NewEnvironmentBuilder().WithFakeClient(coScheme).WithInitObjectPath("testdata", "test-02").WithDynamicObjectsWithStatus(&CustomObject{}).Build()
+		obj := &CustomObject{}
+		Expect(env.Client().Get(env.Ctx, controller.ObjectKey("status", "default"), obj)).To(Succeed())
+		rr := controller.ReconcileResult[*CustomObject, ConditionStatus]{
+			Object:     obj,
+			Conditions: dummyConditions(),
+		}
+		su := preconfiguredStatusUpdaterBuilder().WithPhaseUpdateFunc(func(obj *CustomObject, rr controller.ReconcileResult[*CustomObject, ConditionStatus]) (CustomObjectPhase, error) {
+			return PhaseSucceeded, nil
+		}).Build()
+		now := time.Now()
+		res, err := su.UpdateStatus(env.Ctx, env.Client(), rr)
+		Expect(res).To(Equal(rr.Result))
+		Expect(err).ToNot(HaveOccurred())
+		Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(obj), obj)).To(Succeed())
+
+		Expect(obj.Status.Phase).To(Equal(PhaseSucceeded))
+		Expect(obj.Status.ObservedGeneration).To(Equal(obj.GetGeneration()))
+		Expect(obj.Status.Reason).To(BeEmpty())
+		Expect(obj.Status.Message).To(BeEmpty())
+		Expect(obj.Status.LastReconcileTime.Time).To(BeTemporally("~", now, 1*time.Second))
+		Expect(obj.Status.Conditions).To(ConsistOf(
+			MatchCondition(NewConditionImpl[ConditionStatus]().
+				WithType("TestConditionTrue").
+				WithStatus(ConditionStatusTrue).
+				WithReason("TestReasonTrue").
+				WithMessage("TestMessageTrue").
+				WithLastTransitionTime(obj.Status.LastReconcileTime.Time)),
+			MatchCondition(NewConditionImpl[ConditionStatus]().
+				WithType("TestConditionFalse").
+				WithStatus(ConditionStatusFalse).
+				WithReason("TestReasonFalse").
+				WithMessage("TestMessageFalse").
+				WithLastTransitionTime(obj.Status.LastReconcileTime.Time)),
+		))
+	})
+
+	It("should not update disabled fields", func() {
+		env := testutils.NewEnvironmentBuilder().WithFakeClient(coScheme).WithInitObjectPath("testdata", "test-02").WithDynamicObjectsWithStatus(&CustomObject{}).Build()
+		obj := &CustomObject{}
+		Expect(env.Client().Get(env.Ctx, controller.ObjectKey("status", "default"), obj)).To(Succeed())
+		before := obj.DeepCopy()
+		for _, disabledField := range controller.AllStatusFields() {
+			By(fmt.Sprintf("Testing disabled field %s", disabledField))
+			// reset object to remove changes from previous loop executions
+			modified := obj.DeepCopy()
+			obj.Status = before.Status
+			Expect(env.Client().Status().Patch(env.Ctx, obj, client.MergeFrom(modified))).To(Succeed())
+			rr := controller.ReconcileResult[*CustomObject, ConditionStatus]{
+				Object:     obj,
+				Conditions: dummyConditions(),
+				Reason:     "TestReason",
+				Message:    "TestMessage",
+			}
+			su := preconfiguredStatusUpdaterBuilder().WithPhaseUpdateFunc(func(obj *CustomObject, rr controller.ReconcileResult[*CustomObject, ConditionStatus]) (CustomObjectPhase, error) {
+				return PhaseSucceeded, nil
+			}).WithoutFields(disabledField).Build()
+			now := time.Now()
+			res, err := su.UpdateStatus(env.Ctx, env.Client(), rr)
+			Expect(res).To(Equal(rr.Result))
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(obj), obj)).To(Succeed())
+
+			if disabledField == controller.STATUS_FIELD_PHASE {
+				Expect(obj.Status.Phase).To(Equal(before.Status.Phase))
+			} else {
+				Expect(obj.Status.Phase).To(Equal(PhaseSucceeded))
+			}
+			if disabledField == controller.STATUS_FIELD_OBSERVED_GENERATION {
+				Expect(obj.Status.ObservedGeneration).To(Equal(before.Status.ObservedGeneration))
+			} else {
+				Expect(obj.Status.ObservedGeneration).To(Equal(obj.GetGeneration()))
+			}
+			if disabledField == controller.STATUS_FIELD_REASON {
+				Expect(obj.Status.Reason).To(Equal(before.Status.Reason))
+			} else {
+				Expect(obj.Status.Reason).To(Equal(rr.Reason))
+			}
+			if disabledField == controller.STATUS_FIELD_MESSAGE {
+				Expect(obj.Status.Message).To(Equal(before.Status.Message))
+			} else {
+				Expect(obj.Status.Message).To(Equal(rr.Message))
+			}
+			if disabledField == controller.STATUS_FIELD_LAST_RECONCILE_TIME {
+				Expect(obj.Status.LastReconcileTime.Time).To(Equal(before.Status.LastReconcileTime.Time))
+			} else {
+				Expect(obj.Status.LastReconcileTime.Time).To(BeTemporally("~", now, 1*time.Second))
+			}
+			if disabledField == controller.STATUS_FIELD_CONDITIONS {
+				Expect(obj.Status.Conditions).To(Equal(before.Status.Conditions))
+			} else {
+				Expect(obj.Status.Conditions).To(ConsistOf(
+					MatchCondition(NewConditionImpl[ConditionStatus]().
+						WithType("TestConditionTrue").
+						WithStatus(ConditionStatusTrue).
+						WithReason("TestReasonTrue").
+						WithMessage("TestMessageTrue").
+						WithLastTransitionTime(now).
+						WithTimestampTolerance(1*time.Second)),
+					MatchCondition(NewConditionImpl[ConditionStatus]().
+						WithType("TestConditionFalse").
+						WithStatus(ConditionStatusFalse).
+						WithReason("TestReasonFalse").
+						WithMessage("TestMessageFalse").
+						WithLastTransitionTime(now).
+						WithTimestampTolerance(1*time.Second)),
+				))
+			}
+		}
 	})
 
 })

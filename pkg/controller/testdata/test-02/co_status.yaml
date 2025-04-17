@@ -1,0 +1,23 @@
+apiVersion: testing.openmcp.cloud/v1alpha1
+kind: CustomObject
+metadata:
+  name: status
+  namespace: default
+spec: {}
+status:
+  conditions:
+  - type: "TestConditionTrue"
+    status: "True"
+    lastTransitionTime: "2023-10-01T00:00:00Z"
+  - type: "TestConditionFalse"
+    status: "Unknown"
+    lastTransitionTime: "2023-10-01T00:00:00Z"
+  - type: "AdditionalCondition"
+    status: "True"
+    lastTransitionTime: "2023-10-01T00:00:00Z"
+  observedGeneration: 0
+  phase: "Failed"
+  reason: "OldReason"
+  message: "This is the old message"
+  lastReconcileTime: "2023-10-01T00:00:00Z"
+

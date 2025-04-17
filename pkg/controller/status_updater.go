@@ -215,10 +215,31 @@ func (s *statusUpdater[Obj, PhType, ConType]) UpdateStatus(ctx context.Context, 
 		SetField(status, s.fieldNames[STATUS_FIELD_REASON], reason)
 	}
 	if s.fieldNames[STATUS_FIELD_CONDITIONS] != "" && s.conConstruct != nil {
+		conType := reflect.TypeOf(s.conConstruct())
+		targetType := reflect.TypeOf(GetField(status, s.fieldNames[STATUS_FIELD_CONDITIONS], false))
+		pointerMagic := false
+		if !reflect.SliceOf(conType).AssignableTo(targetType) {
+			// this can happen if the constructor returns a *ConditionImplementation,
+			// but the condition list field is a []ConditionImplementation
+			if conType.Kind() == reflect.Ptr {
+				pointerMagic = true
+				conType = conType.Elem()
+			}
+		}
 		oldConsRaw := GetField(status, s.fieldNames[STATUS_FIELD_CONDITIONS], false)
 		var oldCons []conditions.Condition[ConType]
 		if !IsNil(oldConsRaw) {
-			oldCons = oldConsRaw.([]conditions.Condition[ConType])
+			val := reflect.ValueOf(oldConsRaw)
+			oldCons := make([]conditions.Condition[ConType], val.Len())
+			for i := 0; i < val.Len(); i++ {
+				eVal := val.Index(i)
+				if pointerMagic {
+					ptrValue := reflect.New(conType)
+					reflect.Indirect(ptrValue).Set(eVal)
+					eVal = ptrValue
+				}
+				oldCons[i] = eVal.Interface().(conditions.Condition[ConType])
+			}
 		}
 		cu := conditions.ConditionUpdater(s.conConstruct, oldCons, s.removeUntouchedConditions)
 		cu.Now = now
@@ -226,21 +247,10 @@ func (s *statusUpdater[Obj, PhType, ConType]) UpdateStatus(ctx context.Context, 
 			cu.UpdateConditionFromTemplate(con)
 		}
 		newConsRaw, _ := cu.Conditions()
-		conType := reflect.TypeOf(s.conConstruct())
-		targetType := reflect.TypeOf(GetField(status, s.fieldNames[STATUS_FIELD_CONDITIONS], false))
-		depointerize := false
-		if !reflect.SliceOf(conType).AssignableTo(targetType) {
-			// this can happen if the constructor returns a *ConditionImplementation, which creates a []*ConditionImplementation below,
-			// but the condition list field is a []ConditionImplementation
-			if conType.Kind() == reflect.Ptr {
-				depointerize = true
-				conType = conType.Elem()
-			}
-		}
 		newCons := reflect.MakeSlice(reflect.SliceOf(conType), len(newConsRaw), len(newConsRaw)).Interface()
 		for i := range newConsRaw {
 			val := reflect.ValueOf(newConsRaw[i])
-			if depointerize {
+			if pointerMagic {
 				val = val.Elem()
 			}
 			reflect.ValueOf(newCons).Index(i).Set(val.Convert(conType))

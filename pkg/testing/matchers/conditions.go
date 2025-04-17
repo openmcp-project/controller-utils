@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/onsi/gomega/types"
+
 	"github.com/openmcp-project/controller-utils/pkg/conditions"
 )
 
@@ -59,7 +60,7 @@ func (c *conditionMatcher[T]) Match(actualRaw any) (success bool, err error) {
 	if c.expected.HasMessage() && c.expected.GetMessage() != actual.GetMessage() {
 		return false, nil
 	}
-	if c.expected.HasLastTransitionTime() && !c.expected.GetLastTransitionTime().Equal(actual.GetLastTransitionTime()) {
+	if c.expected.HasLastTransitionTime() && c.expected.GetLastTransitionTime().Sub(actual.GetLastTransitionTime()) > c.expected.timestampTolerance {
 		return false, nil
 	}
 	return true, nil
@@ -103,6 +104,7 @@ type ConditionImpl[T comparable] struct {
 	reason             *string
 	message            *string
 	lastTransitionTime *time.Time
+	timestampTolerance time.Duration
 }
 
 func (c *ConditionImpl[T]) String() string {
@@ -222,6 +224,11 @@ func (c *ConditionImpl[T]) WithReason(reason string) *ConditionImpl[T] {
 
 func (c *ConditionImpl[T]) WithMessage(message string) *ConditionImpl[T] {
 	c.SetMessage(message)
+	return c
+}
+
+func (c *ConditionImpl[T]) WithTimestampTolerance(t time.Duration) *ConditionImpl[T] {
+	c.timestampTolerance = t
 	return c
 }
 
