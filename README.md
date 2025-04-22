@@ -248,6 +248,16 @@ The `ReconcileResult` that is passed into the status updater is expected to cont
 	- If this is non-nil, it must not point to the same instance as `Object` - use the `DeepCopy()` function to create a different instance.
 	- All changes to `Object`'s status that are not part to `OldObject`'s status will be included in the patch during the status update. This can be used to inject custom changes to the status into the status update (in addition to the `WithCustomUpdateFunc` mentioned above).
 
+### errors
+
+The `errors` package contains the `ReasonableError` type, which combines a normal `error` with a reason string. This is useful for errors that happen during reconciliation for updating the resource's status with a reason for the error later on.
+
+#### Noteworthy Functions:
+
+- `WithReason(...)` can be used to wrap a standard error together with a reason into a `ReasonableError`.
+- `Errorf(...)` can be used to wrap an existing `ReasonableError` together with a new error, similarly to how `fmt.Errorf(...)` does it for standard errors.
+- `NewReasonableErrorList(...)` or `Join(...)` can be used to work with lists of errors. `Aggregate()` turns them into a single error again.
+
 ### logging
 
 This package contains the logging library from the [Landscaper controller-utils module](https://github.com/gardener/landscaper/tree/master/controller-utils/pkg/logging).
