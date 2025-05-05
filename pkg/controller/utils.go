@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/base32"
 	"reflect"
 	"strings"
@@ -10,15 +10,16 @@ import (
 )
 
 const (
-	maxLength                int = 63
-	Base32EncodeStdLowerCase     = "abcdefghijklmnopqrstuvwxyz234567"
+	Base32EncodeStdLowerCase = "abcdefghijklmnopqrstuvwxyz234567"
 )
 
-// K8sNameHash takes any number of string arguments and computes a hash out of it, which is then base32-encoded to be a valid k8s resource name.
+// K8sNameHash takes any number of string arguments and computes a hash out of it, which is then base32-encoded to be a valid DNS1123Subdomain k8s resource name
 // The arguments are joined with '/' before being hashed.
 func K8sNameHash(ids ...string) string {
 	name := strings.Join(ids, "/")
-	h := sha1.New()
+	// since we are not worried about length-extension attacks (in fact we are not even using hashing for
+	// any security purposes), use sha2 for better performance compared to sha3
+	h := sha256.New()
 	_, _ = h.Write([]byte(name))
 	// we need base32 encoding as some base64 (even url safe base64) characters are not supported by k8s
 	// see https://kubernetes.io/docs/concepts/overview/working-with-objects/names/
