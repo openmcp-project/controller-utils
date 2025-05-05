@@ -14,20 +14,20 @@ func TestK8sNameHash(t *testing.T) {
 	}{
 		{
 			[]string{"test1"},
-			"wrckybtbh7enmn4vx2nnbpvpkuarsnvm",
+			"dnhq5gcrs4mzrzzsa6cujsllg3b5ahhn67fkgmrvtvxr3a2woaka",
 		},
 		{
 			// check that the same string produces the same hash
 			[]string{"test1"},
-			"wrckybtbh7enmn4vx2nnbpvpkuarsnvm",
+			"dnhq5gcrs4mzrzzsa6cujsllg3b5ahhn67fkgmrvtvxr3a2woaka",
 		},
 		{
 			[]string{"bla"},
-			"76tha37scj5hjglta4tvn6b4kmxeh3ic",
+			"jxz4h5upzsb3e7u5ileqimnhesm7c6dvzanftg2wnsmitoljm4bq",
 		},
 		{
 			[]string{"some other test", "this is a very, very long string"},
-			"fkkzqgh27xym6tqbswyql3wy4atsf6pt",
+			"rjphpfjbmwn6qqydv6xhtmj3kxrlzepn2tpwy4okw2ypoc3nlffq",
 		},
 	}
 
