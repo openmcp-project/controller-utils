@@ -298,6 +298,33 @@ env := testing.NewEnvironmentBuilder().
 env.ShouldReconcile(testing.RequestFromStrings("testresource"))
 ```
 
+### Readiness Checks
+
+The `pkg/readiness` package provides a simple way to check if a kubernetes resource is ready.
+The meaning of readiness depends on the resource type.
+
+#### Example
+
+```go
+deployment := &appsv1.Deployment{}
+err := r.Client.Get(ctx, types.NamespacedName{
+  Name:      "my-deployment",
+  Namespace: "my-namespace",
+}, deployment)
+
+if err != nil {
+  return err
+}
+
+readiness := readiness.CheckDeployment(deployment)
+
+if readiness.IsReady() {
+  fmt.Println("Deployment is ready")
+} else {
+  fmt.Printf("Deployment is not ready: %s\n", readiness.Message())
+}
+```
+
 ## Support, Feedback, Contributing
 
 This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/openmcp-project/controller-utils/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
