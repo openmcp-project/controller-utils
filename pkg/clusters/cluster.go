@@ -23,6 +23,9 @@ type Cluster struct {
 	client client.Client
 	// cluster
 	cluster cluster.Cluster
+
+	clientOpts  *client.Options
+	clusterOpts []cluster.Option
 }
 
 // Initializes a new cluster.
@@ -54,6 +57,36 @@ func (c *Cluster) RegisterConfigPathFlag(flags *flag.FlagSet) {
 		panic("cluster id must be set before registering the config path flag")
 	}
 	flags.StringVar(&c.cfgPath, fmt.Sprintf("%s-cluster", c.id), "", fmt.Sprintf("Path to the %s cluster kubeconfig file or directory containing either a kubeconfig or host, token, and ca file. Leave empty to use in-cluster config.", c.id))
+}
+
+// WithClientOptions allows to overwrite the default client options.
+// It must be called before InitializeClient().
+// Note that using this method disables the the scheme injection during client initialization.
+// This means that the required scheme should already be set in the options that are passed into this method.
+// Returns the cluster for chaining.
+func (c *Cluster) WithClientOptions(opts client.Options) *Cluster {
+	c.clientOpts = &opts
+	return c
+}
+
+// WithClusterOptions allows to overwrite the default cluster options.
+// It must be called before InitializeClient().
+// Note that using this method disables the the scheme injection during client initialization.
+// This means that the required scheme should be set by the cluster options that are passed into this method.
+// The DefaultClusterOptions function can be passed in as a cluster option to set the scheme.
+// Returns the cluster for chaining.
+func (c *Cluster) WithClusterOptions(opts ...cluster.Option) *Cluster {
+	c.clusterOpts = opts
+	return c
+}
+
+// DefaultClusterOptions returns the default cluster options.
+// This is useful when one wants to add custom cluster options without overwriting the default ones via WithClusterOptions().
+func DefaultClusterOptions(scheme *runtime.Scheme) cluster.Option {
+	return func(o *cluster.Options) {
+		o.Scheme = scheme
+		o.Cache.Scheme = scheme
+	}
 }
 
 ///////////////////
@@ -92,14 +125,10 @@ func (c *Cluster) InitializeID(id string) {
 }
 
 // InitializeRESTConfig loads the cluster's REST config.
-// If the config has already been loaded, this is a no-op.
 // Panics if the cluster's id is not set (InitializeID must be called first).
 func (c *Cluster) InitializeRESTConfig() error {
 	if !c.HasID() {
 		panic("cluster id must be set before loading the config")
-	}
-	if c.HasRESTConfig() {
-		return nil
 	}
 	cfg, err := controller.LoadKubeconfig(c.cfgPath)
 	if err != nil {
@@ -111,20 +140,29 @@ func (c *Cluster) InitializeRESTConfig() error {
 
 // InitializeClient creates a new client for the cluster.
 // This also initializes the cluster's controller-runtime 'Cluster' representation.
-// If the client has already been initialized, this is a no-op.
 // Panics if the cluster's REST config has not been loaded (InitializeRESTConfig must be called first).
 func (c *Cluster) InitializeClient(scheme *runtime.Scheme) error {
 	if !c.HasRESTConfig() {
 		panic("cluster REST config must be set before creating the client")
 	}
-	if c.HasClient() {
-		return nil
+	if c.clientOpts == nil {
+		c.clientOpts = &client.Options{
+			Scheme: scheme,
+		}
 	}
-	cli, err := client.New(c.restCfg, client.Options{Scheme: scheme})
+	cli, err := client.New(c.restCfg, *c.clientOpts)
 	if err != nil {
 		return fmt.Errorf("failed to create '%s' cluster client: %w", c.ID(), err)
 	}
-	clu, err := cluster.New(c.restCfg, func(o *cluster.Options) { o.Scheme = scheme; o.Cache.Scheme = scheme })
+	if c.clusterOpts == nil {
+		c.clusterOpts = []cluster.Option{
+			func(o *cluster.Options) {
+				o.Scheme = scheme
+				o.Cache.Scheme = scheme
+			},
+		}
+	}
+	clu, err := cluster.New(c.restCfg, c.clusterOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to create '%s' cluster Cluster representation: %w", c.ID(), err)
 	}
