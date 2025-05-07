@@ -139,7 +139,6 @@ func (tm *ThreadManager) stop() {
 	tm.waitForThreads.Wait()
 	close(tm.returns)
 	tm.log.Info("ThreadManager stopped")
-	return
 }
 
 // Run gives a new thread to run to the ThreadManager.
