@@ -280,13 +280,13 @@ The most relevant use-case for this library in the context of k8s controllers is
 
 - `NewThreadManager` creates a new thread manager.
 	- The first argument is a `context.Context` used by the manager itself. Cancelling this context will stop the manager, and if the context contains a `logging.Logger`, the manager will use it for logging.
-	- The second argument is a `context.Context` that is used as a base context for the executed go routines.
-	- The third argument is an optional function that is executed after any go routine executed with this manager has finished. It is also possible to provide such a function for a specific go routine, instead for all of them, see below.
+	- The second argument is an optional function that is executed after any go routine executed with this manager has finished. It is also possible to provide such a function for a specific go routine, instead for all of them, see below.
 - Use the `Run` method to start a new go routine.
+	- Starting a go routine cancels the context of any running go routine with the same id.
 	- This method also takes an optional function to be executed after the actual workload is done.
 		- A on-finish function specified here is executed before the on-finish function of the manager is executed.
 	- Note that go routines will wait for the thread manager to be started, if that has not yet happened. If the manager has been started, they will be executed immediately.
-	- The thread manager will cancel the context that is passed into the workload function when the manager is being stopped. If any long-running commands are being run as part of the workload, it is recommended to listen to the context's `Done` channel.
+	- The thread manager will cancel the context that is passed into the workload function when the manager is being stopped. If any long-running commands are being run as part of the workload, it is strongly recommended to listen to the context's `Done` channel.
 - Use `Start()` to start the thread manager.
 	- If any go routines have been added before this is called, they will be started now. New go routines added afterwards will be started immediately.
 	- Calling this multiple times doesn't have any effect, unless the manager has already been stopped, in which case `Start()` will panic.
@@ -300,11 +300,11 @@ The most relevant use-case for this library in the context of k8s controllers is
 #### Examples
 
 ```golang
-mgr := threads.NewThreadManager(ctx1, ctx2, nil)
+mgr := threads.NewThreadManager(ctx, nil)
 mgr.Start()
 // do other stuff
 // start a go routine that is restarted automatically if it finishes with an error
-mgr.Run("myTask", func(ctx context.Context) error {
+mgr.Run(myCtx, "myTask", func(ctx context.Context) error {
 	// my task coding
 }, mgr.RestartOnError)
 // do more other stuff

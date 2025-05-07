@@ -39,15 +39,15 @@ var _ = Describe("ThreadManager", func() {
 
 		It("should execute multiple threads", func() {
 			t := &testValue{}
-			mgr := threads.NewThreadManager(context.Background(), context.Background(), nil)
+			mgr := threads.NewThreadManager(context.Background(), nil)
 			threadCount := 5
 			addPerThread := 1
 			for i := range threadCount {
-				mgr.Run(strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
+				mgr.Run(context.Background(), strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
 			}
 			mgr.Start()
 			for i := range threadCount {
-				mgr.Run(strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
+				mgr.Run(context.Background(), strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
 			}
 			mgr.Stop()
 			Expect(t.Value()).To(BeNumerically("==", 2*threadCount*addPerThread))
@@ -55,15 +55,15 @@ var _ = Describe("ThreadManager", func() {
 
 		It("should execute onFinish functions in threads", func() {
 			t := &testValue{}
-			mgr := threads.NewThreadManager(context.Background(), context.Background(), nil)
+			mgr := threads.NewThreadManager(context.Background(), nil)
 			threadCount := 5
 			addPerThread := 1
 			for i := range threadCount {
-				mgr.Run(strconv.Itoa(i), t.AddFuncRun(addPerThread), t.AddFuncOnFinish((-1)*addPerThread))
+				mgr.Run(context.Background(), strconv.Itoa(i), t.AddFuncRun(addPerThread), t.AddFuncOnFinish((-1)*addPerThread))
 			}
 			mgr.Start()
 			for i := range threadCount {
-				mgr.Run(strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
+				mgr.Run(context.Background(), strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
 			}
 			mgr.Stop()
 			Expect(t.Value()).To(BeNumerically("==", threadCount*addPerThread))
@@ -72,21 +72,21 @@ var _ = Describe("ThreadManager", func() {
 		It("should execute onFinish functions in thread manager", func() {
 			t := &testValue{}
 			addPerThread := 1
-			mgr := threads.NewThreadManager(context.Background(), context.Background(), t.AddFuncOnFinish((-1)*addPerThread))
+			mgr := threads.NewThreadManager(context.Background(), t.AddFuncOnFinish((-1)*addPerThread))
 			threadCount := 5
 			for i := range threadCount {
-				mgr.Run(strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
+				mgr.Run(context.Background(), strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
 			}
 			mgr.Start()
 			for i := range threadCount {
-				mgr.Run(strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
+				mgr.Run(context.Background(), strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
 			}
 			mgr.Stop()
 			Expect(t.Value()).To(BeNumerically("==", 0))
 		})
 
 		It("should correctly return whether the manager has been started or stopped", func() {
-			mgr := threads.NewThreadManager(context.Background(), context.Background(), nil)
+			mgr := threads.NewThreadManager(context.Background(), nil)
 			Expect(mgr.IsStarted()).To(BeFalse())
 			Expect(mgr.IsStopped()).To(BeFalse())
 			Expect(mgr.IsRunning()).To(BeFalse())
@@ -101,9 +101,9 @@ var _ = Describe("ThreadManager", func() {
 		})
 
 		It("should stop if the Stop() method is invoked", func() {
-			mgr := threads.NewThreadManager(context.Background(), context.Background(), nil)
+			mgr := threads.NewThreadManager(context.Background(), nil)
 			now := time.Now()
-			mgr.Run("sleep", func(ctx context.Context) error {
+			mgr.Run(context.Background(), "sleep", func(ctx context.Context) error {
 				select {
 				case <-ctx.Done():
 					return nil
@@ -118,9 +118,9 @@ var _ = Describe("ThreadManager", func() {
 
 		It("should stop if the manager context is cancelled", func() {
 			mgrCtx, cancel := context.WithCancel(context.Background())
-			mgr := threads.NewThreadManager(mgrCtx, context.Background(), nil)
+			mgr := threads.NewThreadManager(mgrCtx, nil)
 			now := time.Now()
-			mgr.Run("sleep", func(ctx context.Context) error {
+			mgr.Run(context.Background(), "sleep", func(ctx context.Context) error {
 				select {
 				case <-ctx.Done():
 					return nil
@@ -133,19 +133,37 @@ var _ = Describe("ThreadManager", func() {
 			Expect(time.Now()).To(BeTemporally("<", now.Add(3*time.Second)))
 		})
 
+		It("should cancel a thread if another one with the same id is started", func() {
+			mgr := threads.NewThreadManager(context.Background(), nil)
+			now := time.Now()
+			mgr.Start()
+			tID := "sleep"
+			mgr.Run(context.Background(), tID, func(ctx context.Context) error {
+				select {
+				case <-ctx.Done():
+					return nil
+				case <-time.After(10 * time.Second):
+					return nil
+				}
+			}, nil)
+			mgr.Run(context.Background(), tID, func(ctx context.Context) error { return nil }, nil)
+			mgr.Stop()
+			Expect(time.Now()).To(BeTemporally("<", now.Add(3*time.Second)))
+		})
+
 		It("should have no effect if the manager is started multiple times", func() {
 			t := &testValue{}
-			mgr := threads.NewThreadManager(context.Background(), context.Background(), nil)
+			mgr := threads.NewThreadManager(context.Background(), nil)
 			threadCount := 5
 			addPerThread := 1
 			for i := range threadCount {
-				mgr.Run(strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
+				mgr.Run(context.Background(), strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
 			}
 			mgr.Start()
 			mgr.Start()
 			mgr.Start()
 			for i := range threadCount {
-				mgr.Run(strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
+				mgr.Run(context.Background(), strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
 			}
 			mgr.Start()
 			mgr.Start()
@@ -156,15 +174,15 @@ var _ = Describe("ThreadManager", func() {
 
 		It("should have no effect if the manager is stopped multiple times", func() {
 			t := &testValue{}
-			mgr := threads.NewThreadManager(context.Background(), context.Background(), nil)
+			mgr := threads.NewThreadManager(context.Background(), nil)
 			threadCount := 5
 			addPerThread := 1
 			for i := range threadCount {
-				mgr.Run(strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
+				mgr.Run(context.Background(), strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
 			}
 			mgr.Start()
 			for i := range threadCount {
-				mgr.Run(strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
+				mgr.Run(context.Background(), strconv.Itoa(i), t.AddFuncRun(addPerThread), nil)
 			}
 			mgr.Stop()
 			mgr.Stop()
@@ -173,7 +191,7 @@ var _ = Describe("ThreadManager", func() {
 		})
 
 		It("should panic if Start() is called after Stop()", func() {
-			mgr := threads.NewThreadManager(context.Background(), context.Background(), nil)
+			mgr := threads.NewThreadManager(context.Background(), nil)
 			mgr.Start()
 			mgr.Stop()
 			Expect(mgr.Start).To(Panic())

@@ -31,34 +31,29 @@ type OnFinishFunc func(context.Context, ThreadReturn)
 //  1. If the context is cancelled, the ThreadManager is stopped. Alternatively, its Stop() method can be called.
 //  2. If the context contains a logger, it is used for logging.
 //
-// The threadCtx will be passed to the threads and is cancelled when the ThreadManager is stopped.
 // If onFinish is not nil, it will be called whenever a thread finishes. It is called after the thread's own onFinish function, if any.
-func NewThreadManager(mgrCtx, threadCtx context.Context, onFinish OnFinishFunc) *ThreadManager {
-	threadCtx, stopFunc := context.WithCancel(threadCtx)
+func NewThreadManager(mgrCtx context.Context, onFinish OnFinishFunc) *ThreadManager {
 	return &ThreadManager{
-		threadCtx:   threadCtx,
-		returns:     make(chan ThreadReturn, 100),
-		onFinish:    onFinish,
-		log:         logging.FromContextOrDiscard(mgrCtx),
-		runOnStart:  []*Thread{},
-		ctxStop:     mgrCtx.Done(),
-		stopThreads: stopFunc,
+		returns:           make(chan ThreadReturn, 100),
+		onFinish:          onFinish,
+		log:               logging.FromContextOrDiscard(mgrCtx),
+		runOnStart:        map[string]*Thread{},
+		mgrStop:           mgrCtx.Done(),
+		threadCancelFuncs: map[string]context.CancelFunc{},
 	}
 }
 
 type ThreadManager struct {
-	lock           sync.Mutex
-	threadCtx      context.Context    // context that is passed to threads, is cancelled when the ThreadManager is stopped
-	returns        chan ThreadReturn  // channel to receive thread returns
-	onFinish       OnFinishFunc       // function to call when a thread finishes
-	log            logging.Logger     // logger for the ThreadManager
-	runOnStart     []*Thread          // is filled if threads are added before the ThreadManager is started
-	ctxStop        <-chan struct{}    // channel to stop the ThreadManager
-	stopThreads    context.CancelFunc // function to cancel the context that is passed to threads
-	stopSelf       func()             // convenience function to use the internalStop channel
-	internalStop   chan struct{}      // if the Stop() method is called, we need to stop the internal main loop by using this channel
-	stopped        atomic.Bool        // indicates if the ThreadManager is stopped
-	waitForThreads sync.WaitGroup     // used to wait for threads to finish when stopping the ThreadManager
+	lock              sync.Mutex                    // generic lock for the ThreadManager
+	lockThreadMap     sync.Mutex                    // lock specifically for the threadCancelFuncs map
+	returns           chan ThreadReturn             // channel to receive thread returns
+	onFinish          OnFinishFunc                  // function to call when a thread finishes
+	log               logging.Logger                // logger for the ThreadManager
+	runOnStart        map[string]*Thread            // is filled if threads are added before the ThreadManager is started
+	mgrStop           <-chan struct{}               // channel to stop the ThreadManager
+	stopped           atomic.Bool                   // indicates if the ThreadManager is stopped
+	waitForThreads    sync.WaitGroup                // used to wait for threads to finish when stopping the ThreadManager
+	threadCancelFuncs map[string]context.CancelFunc // map of thread ids to cancel functions
 }
 
 // Start starts the ThreadManager.
@@ -94,10 +89,10 @@ func (tm *ThreadManager) Start() {
 				}
 			case sig := <-sigs:
 				tm.log.Info("Received os signal, stopping ThreadManager", "signal", sig)
-				tm.stop()
+				tm.Stop()
 				return
-			case <-tm.ctxStop:
-				tm.stop()
+			case <-tm.mgrStop:
+				tm.Stop()
 				return
 			}
 		}
@@ -113,6 +108,7 @@ func (tm *ThreadManager) Start() {
 }
 
 // Stop stops the ThreadManager.
+// Panics if the ThreadManager has not been started yet.
 // Calling Stop() multiple times is a no-op.
 // It is not possible to start the ThreadManager again after it has been stopped, a new instance must be created.
 // Adding threads after the ThreadManager has been stopped is a no-op.
@@ -133,7 +129,12 @@ func (tm *ThreadManager) stop() {
 	}
 	tm.log.Info("Stopping ThreadManager, waiting for remaining threads to finish")
 	tm.stopped.Store(true)
-	tm.stopThreads()
+	tm.lockThreadMap.Lock()
+	for id, cancel := range tm.threadCancelFuncs {
+		tm.log.Debug("Cancelling thread", "thread", id)
+		cancel()
+	}
+	tm.lockThreadMap.Unlock()
 
 	tm.waitForThreads.Wait()
 	close(tm.returns)
@@ -142,12 +143,16 @@ func (tm *ThreadManager) stop() {
 }
 
 // Run gives a new thread to run to the ThreadManager.
-// id is only used for logging and debugging purposes.
+// The context is used to create a new context with a cancel function for the thread.
+// id is used for logging and debugging purposes.
+// Note that when a thread with the same id as an already running thread is added, the running thread will be cancelled.
+// If the ThreadManager has not been started yet, the previously added thread with the conflicting id will be discarded and the newly added one will be run when the ThreadManager is started instead.
+// A thread MUST NOT start another thread with the same id as itself during its work function. If a thread wants to restart itself, this must happen in the onFinish function.
 // work is the actual workload of the thread.
 // onFinish can be used to react to the thread having finished.
-// Note that there are some pre-defined functions that can be used as onFinish functions, e.g. the ThreadManager's Restart method.
-func (tm *ThreadManager) Run(id string, work func(context.Context) error, onFinish OnFinishFunc) {
-	tm.RunThread(NewThread(id, work, onFinish))
+// There are some pre-defined functions that can be used as onFinish functions, e.g. the ThreadManager's Restart method.
+func (tm *ThreadManager) Run(ctx context.Context, id string, work func(context.Context) error, onFinish OnFinishFunc) {
+	tm.RunThread(NewThread(ctx, id, work, onFinish))
 }
 
 // RunThread is the same as Run, but takes a Thread struct instead of the individual parameters.
@@ -167,28 +172,48 @@ func (tm *ThreadManager) run(t *Thread) {
 		return
 	}
 	if !tm.isStarted() {
-		tm.runOnStart = append(tm.runOnStart, t)
 		tm.log.Debug("ThreadManager has not been started yet, enqueuing thread to run on start", "thread", t.ID())
+		_, ok := tm.runOnStart[t.id]
+		if ok {
+			tm.log.Debug("Discarding thread with the same id that was already enqueued", "thread", t.id)
+		}
+		tm.runOnStart[t.id] = t
 		return
 	}
 	tm.log.Debug("Running thread", "thread", t.id)
+	tm.lockThreadMap.Lock()
+	if cancel := tm.threadCancelFuncs[t.id]; cancel != nil {
+		tm.log.Debug("A thread with the same id is already running, cancelling it", "thread", t.id)
+		cancel()
+	}
+	tm.threadCancelFuncs[t.id] = t.cancel
+	tm.lockThreadMap.Unlock()
 	tm.waitForThreads.Add(1)
 	go func() {
 		defer tm.waitForThreads.Done()
 		var err error
 		if t.work != nil {
-			err = t.work(tm.threadCtx)
+			err = t.work(t.ctx)
 		} else {
 			tm.log.Debug("Thread has no work function", "thread", t.id)
 		}
+		tm.lockThreadMap.Lock()
+		// thread must be removed from the internal map here, because otherwise the thread might be restarted before the cancel function is removed
+		// which would then wrongfully remove the cancel function of the new thread
+		if cancelOld := tm.threadCancelFuncs[t.id]; cancelOld != nil { // this should always be true
+			// cancel the thread's context, just to be sure that no running thread can 'leak' by losing its cancel function
+			cancelOld()
+			delete(tm.threadCancelFuncs, t.id)
+		}
+		tm.lockThreadMap.Unlock()
 		tr := NewThreadReturn(t, err)
 		if t.onFinish != nil {
 			tm.log.Debug("Calling the thread's onFinish function", "thread", t.id)
-			t.onFinish(tm.threadCtx, tr)
+			t.onFinish(t.ctx, tr)
 		}
 		if tm.onFinish != nil {
 			tm.log.Debug("Calling the thread manager's onFinish function", "thread", tr.Thread.id)
-			tm.onFinish(tm.threadCtx, tr)
+			tm.onFinish(t.ctx, tr)
 		}
 		tm.returns <- tr
 		tm.log.Debug("Thread finished", "thread", t.id)
@@ -225,7 +250,7 @@ var _ OnFinishFunc = (*ThreadManager)(nil).Restart
 // Restart is a pre-defined onFinish function that can be used to restart a thread after it has finished.
 // This method is not meant to be called directly, instead pass it to the ThreadManager's Run method as the onFinish parameter:
 //
-//	tm.Run("myThread", myWorkFunc, tm.Restart)
+//	tm.Run(ctx, "myThread", myWorkFunc, tm.Restart)
 func (tm *ThreadManager) Restart(_ context.Context, tr ThreadReturn) {
 	if tm.stopped.Load() {
 		return
@@ -239,10 +264,10 @@ var _ OnFinishFunc = (*ThreadManager)(nil).RestartOnError
 // It is the opposite of RestartOnSuccess.
 // This method is not meant to be called directly, instead pass it to the ThreadManager's Run method as the onFinish parameter:
 //
-//	tm.Run("myThread", myWorkFunc, tm.RestartOnError)
-func (tm *ThreadManager) RestartOnError(_ context.Context, tr ThreadReturn) {
+//	tm.Run(ctx, "myThread", myWorkFunc, tm.RestartOnError)
+func (tm *ThreadManager) RestartOnError(ctx context.Context, tr ThreadReturn) {
 	if tr.Err != nil {
-		tm.Restart(tm.threadCtx, tr)
+		tm.Restart(ctx, tr)
 	}
 }
 
@@ -252,18 +277,22 @@ var _ OnFinishFunc = (*ThreadManager)(nil).RestartOnSuccess
 // It is the opposite of RestartOnError.
 // This method is not meant to be called directly, instead pass it to the ThreadManager's Run method as the onFinish parameter:
 //
-//	tm.Run("myThread", myWorkFunc, tm.RestartOnSuccess)
-func (tm *ThreadManager) RestartOnSuccess(_ context.Context, tr ThreadReturn) {
+//	tm.Run(ctx, "myThread", myWorkFunc, tm.RestartOnSuccess)
+func (tm *ThreadManager) RestartOnSuccess(ctx context.Context, tr ThreadReturn) {
 	if tr.Err == nil {
-		tm.Restart(tm.threadCtx, tr)
+		tm.Restart(ctx, tr)
 	}
 }
 
 // NewThread creates a new thread with the given id, work function and onFinish function.
 // It is usually not required to call this function directly, instead use the ThreadManager's Run method.
+// A new context with a cancel function is derived from the context passed to the constructor.
 // The Thread's fields are considered immutable after creation.
-func NewThread(id string, work WorkFunc, onFinish OnFinishFunc) Thread {
+func NewThread(ctx context.Context, id string, work WorkFunc, onFinish OnFinishFunc) Thread {
+	ctx, cancel := context.WithCancel(ctx)
 	return Thread{
+		ctx:      ctx,
+		cancel:   cancel,
 		id:       id,
 		work:     work,
 		onFinish: onFinish,
@@ -272,9 +301,22 @@ func NewThread(id string, work WorkFunc, onFinish OnFinishFunc) Thread {
 
 // Thread represents a thread that can be run by the ThreadManager.
 type Thread struct {
+	ctx      context.Context
+	cancel   context.CancelFunc
 	id       string
 	work     WorkFunc
 	onFinish OnFinishFunc
+}
+
+// Context returns the context of the thread.
+func (t *Thread) Context() context.Context {
+	return t.ctx
+}
+
+// Cancel cancels the thread's context.
+// The thread manager cancels all threads' contexts when it is stopped, so calling this manually is usually not necessary.
+func (t *Thread) Cancel() {
+	t.cancel()
 }
 
 // ID returns the id of the thread.
