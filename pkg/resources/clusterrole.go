@@ -3,17 +3,27 @@ package resources
 import (
 	"fmt"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type ClusterRoleMutator struct {
-	Name   string
-	Labels map[string]string
-	Rules  []v1.PolicyRule
+	Name  string
+	Rules []v1.PolicyRule
+	meta  Mutator[client.Object]
 }
 
 var _ Mutator[*v1.ClusterRole] = &ClusterRoleMutator{}
+
+func NewClusterRoleMutator(name string, rules []v1.PolicyRule, labels map[string]string, annotations map[string]string) Mutator[*v1.ClusterRole] {
+	return &ClusterRoleMutator{
+		Name:  name,
+		Rules: rules,
+		meta:  NewMetadataMutator(labels, annotations),
+	}
+}
 
 func (m *ClusterRoleMutator) String() string {
 	return fmt.Sprintf("clusterrole %s", m.Name)
@@ -32,7 +42,6 @@ func (m *ClusterRoleMutator) Empty() *v1.ClusterRole {
 }
 
 func (m *ClusterRoleMutator) Mutate(r *v1.ClusterRole) error {
-	r.ObjectMeta.Labels = m.Labels
 	r.Rules = m.Rules
-	return nil
+	return m.meta.Mutate(r)
 }
