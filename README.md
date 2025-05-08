@@ -270,6 +270,47 @@ The library provides a wrapper around `logr.Logger`, exposing additional helper 
 - There are several `FromContext...` functions for retrieving a logger from a `context.Context` object.
 - `InitFlags(...)` can be used to add the configuration flags for this logger to a cobra `FlagSet`.
 
+### threads
+
+The `threads` package provides a simple thread managing library. It can be used to run go routines in a non-blocking manner and provides the possibility to react if the routine has exited.
+
+The most relevant use-case for this library in the context of k8s controllers is to handle dynamic watches on multiple clusters. To start a watch, that cluster's cache's `Start` method has to be used. Because this method is blocking, it has to be executed in a different go routine, and because it can return an error, a simple `go cache.Start(...)` is not enough, because it would hide the error.
+
+#### Noteworthy Functions
+
+- `NewThreadManager` creates a new thread manager.
+	- The first argument is a `context.Context` used by the manager itself. Cancelling this context will stop the manager, and if the context contains a `logging.Logger`, the manager will use it for logging.
+	- The second argument is an optional function that is executed after any go routine executed with this manager has finished. It is also possible to provide such a function for a specific go routine, instead for all of them, see below.
+- Use the `Run` method to start a new go routine.
+	- Starting a go routine cancels the context of any running go routine with the same id.
+	- This method also takes an optional function to be executed after the actual workload is done.
+		- A on-finish function specified here is executed before the on-finish function of the manager is executed.
+	- Note that go routines will wait for the thread manager to be started, if that has not yet happened. If the manager has been started, they will be executed immediately.
+	- The thread manager will cancel the context that is passed into the workload function when the manager is being stopped. If any long-running commands are being run as part of the workload, it is strongly recommended to listen to the context's `Done` channel.
+- Use `Start()` to start the thread manager.
+	- If any go routines have been added before this is called, they will be started now. New go routines added afterwards will be started immediately.
+	- Calling this multiple times doesn't have any effect, unless the manager has already been stopped, in which case `Start()` will panic.
+- There are three ways to stop the thread manager again:
+	- Use its `Stop()` method.
+		- This is a blocking method that waits for all remaining go routines to finish. Their context is cancelled to notify them of the manager being stopped.
+	- Cancel the context that was passed into `NewThreadManager` as the first argument.
+	- Send a `SIGTERM` or `SIGINT` signal to the process.
+- The `TaskManager`'s `Restart`, `RestartOnError`, and `RestartOnSuccess` methods are pre-defined on-finish functions. They are not meant to be used directly, but instead be used as an argument to `Run`. See the example below.
+
+#### Examples
+
+```golang
+mgr := threads.NewThreadManager(ctx, nil)
+mgr.Start()
+// do other stuff
+// start a go routine that is restarted automatically if it finishes with an error
+mgr.Run(myCtx, "myTask", func(ctx context.Context) error {
+	// my task coding
+}, mgr.RestartOnError)
+// do more other stuff
+mgr.Stop()
+```
+
 ### testing
 
 This package contains useful functionality to aid with writing tests.
@@ -296,6 +337,108 @@ env := testing.NewEnvironmentBuilder().
   Build()
 
 env.ShouldReconcile(testing.RequestFromStrings("testresource"))
+```
+
+### Readiness Checks
+
+The `pkg/readiness` package provides a simple way to check if a kubernetes resource is ready.
+The meaning of readiness depends on the resource type.
+
+#### Example
+
+```go
+deployment := &appsv1.Deployment{}
+err := r.Client.Get(ctx, types.NamespacedName{
+  Name:      "my-deployment",
+  Namespace: "my-namespace",
+}, deployment)
+
+if err != nil {
+  return err
+}
+
+readiness := readiness.CheckDeployment(deployment)
+
+if readiness.IsReady() {
+  fmt.Println("Deployment is ready")
+} else {
+  fmt.Printf("Deployment is not ready: %s\n", readiness.Message())
+}
+```
+
+### Kubernetes resource management
+
+The `pkg/resource` package contains some useful functions for working with Kubernetes resources. The `Mutator` interface can be used to modify resources in a generic way. It is used by the `Mutate` function, which takes a resource and a mutator and applies the mutator to the resource.
+The package also contains convenience types for the most common resource types, e.g. `ConfigMap`, `Secret`, `ClusterRole`, `ClusterRoleBinding`, etc. These types implement the `Mutator` interface and can be used to modify the corresponding resources.
+
+#### Examples
+
+Create or update a `ConfigMap`, a `ServiceAccount` and a `Deployment` using the `Mutator` interface:
+
+```go
+type myDeploymentMutator struct {
+}
+
+var _ resource.Mutator[*appsv1.Deployment] = &myDeploymentMutator{}
+
+func newDeploymentMutator() resources.Mutator[*appsv1.Deployment] {
+	return &MyDeploymentMutator{}
+}
+
+func (m *MyDeploymentMutator) String() string {
+	return "deployment default/test"
+}
+
+func (m *MyDeploymentMutator) Empty() *appsv1.Deployment {
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{	
+			Name:      "test",
+			Namespace: "default",
+		},
+	}
+}
+
+func (m *MyDeploymentMutator) Mutate(deployment *appsv1.Deployment) error {
+	// create one container with an image
+	deployment.Spec.Template.Spec.Containers = []corev1.Container{
+		{
+			Name:  "test",
+			Image: "test-image:latest",
+		},
+	}
+	return nil
+}
+
+
+func ReconcileResources(ctx context.Context, client client.Client) error {
+	configMapResource := resource.NewConfigMap("my-configmap", "my-namespace", map[string]string{)
+		"label1": "value1",
+		"label2": "value2",
+	}, nil)
+
+	serviceAccountResource := resource.NewServiceAccount("my-serviceaccount", "my-namespace", nil, nil)
+	
+	myDeploymentMutator := newDeploymentMutator()
+	
+	var err error
+	
+	err = resources.CreateOrUpdateResource(ctx, client, configMapResource)
+	if err != nil {
+		return err
+	}
+	
+	resources.CreateOrUpdateResource(ctx, client, serviceAccountResource)
+	if err != nil {
+		return err
+	}
+	
+	err = resources.CreateOrUpdateResource(ctx, client, myDeploymentMutator)
+	if err != nil {
+		return err
+	}
+	
+	return nil
+}
 ```
 
 ## Support, Feedback, Contributing
