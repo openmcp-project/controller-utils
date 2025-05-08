@@ -339,6 +339,33 @@ env := testing.NewEnvironmentBuilder().
 env.ShouldReconcile(testing.RequestFromStrings("testresource"))
 ```
 
+### Readiness Checks
+
+The `pkg/readiness` package provides a simple way to check if a kubernetes resource is ready.
+The meaning of readiness depends on the resource type.
+
+#### Example
+
+```go
+deployment := &appsv1.Deployment{}
+err := r.Client.Get(ctx, types.NamespacedName{
+  Name:      "my-deployment",
+  Namespace: "my-namespace",
+}, deployment)
+
+if err != nil {
+  return err
+}
+
+readiness := readiness.CheckDeployment(deployment)
+
+if readiness.IsReady() {
+  fmt.Println("Deployment is ready")
+} else {
+  fmt.Printf("Deployment is not ready: %s\n", readiness.Message())
+}
+```
+
 ### Kubernetes resource management
 
 The `pkg/resource` package contains some useful functions for working with Kubernetes resources. The `Mutator` interface can be used to modify resources in a generic way. It is used by the `Mutate` function, which takes a resource and a mutator and applies the mutator to the resource.
@@ -412,7 +439,6 @@ func ReconcileResources(ctx context.Context, client client.Client) error {
 	
 	return nil
 }
-
 ```
 
 ## Support, Feedback, Contributing
