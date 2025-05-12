@@ -36,6 +36,16 @@ func New(id string) *Cluster {
 	return c
 }
 
+// NewTestClusterFromClient creates a Cluster from a given client.
+// Note that this method is meant for testing purposes only and it does not result in a fully functional Cluster.
+// Calling anything except Client() on the resulting Cluster is undefined and might lead to panics or unexpected behavior.
+func NewTestClusterFromClient(id string, cli client.Client) *Cluster {
+	c := &Cluster{}
+	c.InitializeID(id)
+	c.client = cli
+	return c
+}
+
 // WithConfigPath sets the config path for the cluster.
 // Returns the cluster for chaining.
 func (c *Cluster) WithConfigPath(cfgPath string) *Cluster {
