@@ -5,6 +5,7 @@ package controller
 import (
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -177,6 +178,22 @@ func LostLabelPredicate(key, val string) predicate.Predicate {
 		value: val,
 		mod:   -1,
 	}
+}
+
+// LabelSelectorPredicate returns a predicate based on a label selector.
+// Opposed to the similarly named function from the controller-runtime library, this one works on label.Selector
+// instead of metav1.LabelSelector.
+func LabelSelectorPredicate(sel labels.Selector) predicate.Predicate {
+	return predicate.NewPredicateFuncs(func(obj client.Object) bool {
+		if obj == nil {
+			return false
+		}
+		ls := obj.GetLabels()
+		if ls == nil {
+			ls = map[string]string{}
+		}
+		return sel.Matches(labels.Set(ls))
+	})
 }
 
 /////////////////////////

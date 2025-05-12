@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -114,8 +115,24 @@ var _ = Describe("Predicates", func() {
 		It("should detect changes to the labels", func() {
 			pHasFoo := ctrlutils.HasLabelPredicate("foo", "")
 			pHasBar := ctrlutils.HasLabelPredicate("bar", "")
+			matchesEverything := ctrlutils.LabelSelectorPredicate(labels.Everything())
+			matchesNothing := ctrlutils.LabelSelectorPredicate(labels.Nothing())
 			pHasFooWithFoo := ctrlutils.HasLabelPredicate("foo", "foo")
 			pHasFooWithBar := ctrlutils.HasLabelPredicate("foo", "bar")
+			fooWithFooSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"foo": "foo",
+				},
+			})
+			Expect(err).ToNot(HaveOccurred())
+			fooWithBarSelector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"foo": "bar",
+				},
+			})
+			Expect(err).ToNot(HaveOccurred())
+			pHasFooWithFooViaSelector := ctrlutils.LabelSelectorPredicate(fooWithFooSelector)
+			pHasFooWithBarViaSelector := ctrlutils.LabelSelectorPredicate(fooWithBarSelector)
 			pGotFoo := ctrlutils.GotLabelPredicate("foo", "")
 			pGotFooWithFoo := ctrlutils.GotLabelPredicate("foo", "foo")
 			pGotFooWithBar := ctrlutils.GotLabelPredicate("foo", "bar")
@@ -124,9 +141,13 @@ var _ = Describe("Predicates", func() {
 			pLostFooWithBar := ctrlutils.LostLabelPredicate("foo", "bar")
 			By("old and new resource are equal")
 			e := updateEvent(base, changed)
+			Expect(matchesEverything.Update(e)).To(BeTrue(), "'everything' LabelSelector should always match")
+			Expect(matchesNothing.Update(e)).To(BeFalse(), "'nothing' LabelSelector should never match")
 			Expect(pHasFoo.Update(e)).To(BeFalse(), "HasLabelPredicate should return false if there are no labels")
 			Expect(pHasFooWithFoo.Update(e)).To(BeFalse(), "HasLabelPredicate should return false if there are no labels")
+			Expect(pHasFooWithFooViaSelector.Update(e)).To(BeFalse(), "LabelSelectorPredicate should return false if the labels are not matched")
 			Expect(pHasFooWithBar.Update(e)).To(BeFalse(), "HasLabelPredicate should return false if there are no labels")
+			Expect(pHasFooWithBarViaSelector.Update(e)).To(BeFalse(), "LabelSelectorPredicate should return falseif the labels are not matched")
 			Expect(pGotFoo.Update(e)).To(BeFalse(), "GotLabelPredicate should return false if there are no labels")
 			Expect(pGotFooWithFoo.Update(e)).To(BeFalse(), "GotLabelPredicate should return false if there are no labels")
 			Expect(pGotFooWithBar.Update(e)).To(BeFalse(), "GotLabelPredicate should return false if there are no labels")
@@ -138,10 +159,14 @@ var _ = Describe("Predicates", func() {
 				"foo": "foo",
 			})
 			e = updateEvent(base, changed)
+			Expect(matchesEverything.Update(e)).To(BeTrue(), "'everything' LabelSelector should always match")
+			Expect(matchesNothing.Update(e)).To(BeFalse(), "'nothing' LabelSelector should never match")
 			Expect(pHasFoo.Update(e)).To(BeTrue(), "HasLabelPredicate should return true if the label is there")
 			Expect(pHasBar.Update(e)).To(BeFalse(), "HasLabelPredicate should return false if the label is not there")
 			Expect(pHasFooWithFoo.Update(e)).To(BeTrue(), "HasLabelPredicate should return true if the label is there and has the fitting value")
+			Expect(pHasFooWithFooViaSelector.Update(e)).To(BeTrue(), "LabelSelectorPredicate should return true if the labels are matched")
 			Expect(pHasFooWithBar.Update(e)).To(BeFalse(), "HasLabelPredicate should return false if the label is there but has the wrong value")
+			Expect(pHasFooWithBarViaSelector.Update(e)).To(BeFalse(), "LabelSelectorPredicate should return false if the labels are not matched")
 			Expect(pGotFoo.Update(e)).To(BeTrue(), "GotLabelPredicate should return true if the label was added")
 			Expect(pGotFooWithFoo.Update(e)).To(BeTrue(), "GotLabelPredicate should return true if the label was added with the correct value")
 			Expect(pGotFooWithBar.Update(e)).To(BeFalse(), "GotLabelPredicate should return false if the label was added but with the wrong value")
@@ -154,10 +179,14 @@ var _ = Describe("Predicates", func() {
 				"foo": "bar",
 			})
 			e = updateEvent(base, changed)
+			Expect(matchesEverything.Update(e)).To(BeTrue(), "'everything' LabelSelector should always match")
+			Expect(matchesNothing.Update(e)).To(BeFalse(), "'nothing' LabelSelector should never match")
 			Expect(pHasFoo.Update(e)).To(BeTrue(), "HasLabelPredicate should return true if the label is there")
 			Expect(pHasBar.Update(e)).To(BeFalse(), "HasLabelPredicate should return false if the label is not there")
 			Expect(pHasFooWithFoo.Update(e)).To(BeFalse(), "HasLabelPredicate should return false if the label is there but has the wrong value")
+			Expect(pHasFooWithFooViaSelector.Update(e)).To(BeFalse(), "LabelSelectorPredicate should return false if the labels are not matched")
 			Expect(pHasFooWithBar.Update(e)).To(BeTrue(), "HasLabelPredicate should return true if the label is there and has the fitting value")
+			Expect(pHasFooWithBarViaSelector.Update(e)).To(BeTrue(), "LabelSelectorPredicate should return true if the labels are matched")
 			Expect(pGotFoo.Update(e)).To(BeFalse(), "GotLabelPredicate should return false if the label was there before")
 			Expect(pGotFooWithFoo.Update(e)).To(BeFalse(), "GotLabelPredicate should return false if the label was changed but to the wrong value")
 			Expect(pGotFooWithBar.Update(e)).To(BeTrue(), "GotLabelPredicate should return true if the label was changed to the correct value")
@@ -168,9 +197,13 @@ var _ = Describe("Predicates", func() {
 			base = changed.DeepCopy()
 			changed.SetLabels(nil)
 			e = updateEvent(base, changed)
+			Expect(matchesEverything.Update(e)).To(BeTrue(), "'everything' LabelSelector should always match")
+			Expect(matchesNothing.Update(e)).To(BeFalse(), "'nothing' LabelSelector should never match")
 			Expect(pHasFoo.Update(e)).To(BeFalse(), "HasLabelPredicate should return false if there are no labels")
 			Expect(pHasFooWithFoo.Update(e)).To(BeFalse(), "HasLabelPredicate should return false if there are no labels")
+			Expect(pHasFooWithFooViaSelector.Update(e)).To(BeFalse(), "LabelSelectorPredicate should return false if the labels are not matched")
 			Expect(pHasFooWithBar.Update(e)).To(BeFalse(), "HasLabelPredicate should return false if there are no labels")
+			Expect(pHasFooWithBarViaSelector.Update(e)).To(BeFalse(), "LabelSelectorPredicate should return false if the labels are not matched")
 			Expect(pGotFoo.Update(e)).To(BeFalse(), "GotLabelPredicate should return false if there are no labels")
 			Expect(pGotFooWithFoo.Update(e)).To(BeFalse(), "GotLabelPredicate should return false if there are no labels")
 			Expect(pGotFooWithBar.Update(e)).To(BeFalse(), "GotLabelPredicate should return false if there are no labels")
