@@ -6,3 +6,4 @@ includes:
     flatten: true
     vars:
       CODE_DIRS: '{{.ROOT_DIR}}/pkg/...'
+      GENERATE_DOCS_INDEX: "true"
