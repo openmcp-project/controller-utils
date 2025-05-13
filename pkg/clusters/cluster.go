@@ -61,12 +61,19 @@ func (c *Cluster) WithRESTConfig(cfg *rest.Config) *Cluster {
 }
 
 // RegisterConfigPathFlag adds a flag '--<id>-cluster' for the cluster's config path to the given flag set.
+// If only a single kubeconfig is required, RegisterSingleConfigPathFlag can be used instead to have the flag named '--kubeconfig'.
 // Panics if the cluster's id is not set.
 func (c *Cluster) RegisterConfigPathFlag(flags *flag.FlagSet) {
 	if !c.HasID() {
 		panic("cluster id must be set before registering the config path flag")
 	}
 	flags.StringVar(&c.cfgPath, fmt.Sprintf("%s-cluster", c.id), "", fmt.Sprintf("Path to the %s cluster kubeconfig file or directory containing either a kubeconfig or host, token, and ca file. Leave empty to use in-cluster config.", c.id))
+}
+
+// RegisterSingleConfigPathFlag adds a '--kubeconfig' flag for the cluster's config path to the given flag set.
+// If more than one kubeconfig is required, consider using RegisterConfigPathFlag instead, which is identical, but names the flag '--<id>-cluster'.
+func (c *Cluster) RegisterSingleConfigPathFlag(flags *flag.FlagSet) {
+	flags.StringVar(&c.cfgPath, "kubeconfig", "", "Path to the kubeconfig file or directory containing either a kubeconfig or host, token, and ca file. Leave empty to use in-cluster config.")
 }
 
 // WithClientOptions allows to overwrite the default client options.
