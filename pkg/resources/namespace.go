@@ -3,15 +3,13 @@ package resources
 import (
 	"fmt"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type namespaceMutator struct {
 	name string
-	meta Mutator[client.Object]
+	meta MetadataMutator
 }
 
 var _ Mutator[*v1.Namespace] = &namespaceMutator{}
@@ -38,4 +36,8 @@ func (m *namespaceMutator) Empty() *v1.Namespace {
 
 func (m *namespaceMutator) Mutate(r *v1.Namespace) error {
 	return m.meta.Mutate(r)
+}
+
+func (m *namespaceMutator) MetadataMutator() MetadataMutator {
+	return m.meta
 }

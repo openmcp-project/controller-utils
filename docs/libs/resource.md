@@ -9,12 +9,15 @@ Create or update a `ConfigMap`, a `ServiceAccount` and a `Deployment` using the 
 
 ```go
 type myDeploymentMutator struct {
+	meta MetadataMutator
 }
 
 var _ resource.Mutator[*appsv1.Deployment] = &myDeploymentMutator{}
 
-func newDeploymentMutator() resources.Mutator[*appsv1.Deployment] {
-	return &MyDeploymentMutator{}
+func newDeploymentMutator(labels map[string]string, annotations map[string]string) resource.Mutator[*appsv1.Deployment] {
+	return &MyDeploymentMutator{
+		meta: NewMetadataMutator(labels, annotations)
+	}
 }
 
 func (m *MyDeploymentMutator) String() string {
@@ -38,7 +41,11 @@ func (m *MyDeploymentMutator) Mutate(deployment *appsv1.Deployment) error {
 			Image: "test-image:latest",
 		},
 	}
-	return nil
+	return m.meta.Mutate(deployment)
+}
+
+func (m *MyDeploymentMutator) MetadataMutator() MetadataMutator {
+	return m.meta
 }
 
 

@@ -12,6 +12,7 @@ type Mutator[K client.Object] interface {
 	Empty() K
 	Mutate(res K) error
 	String() string
+	MetadataMutator() MetadataMutator
 }
 
 func GetResource[K client.Object](ctx context.Context, clt client.Client, m Mutator[K]) (K, error) {

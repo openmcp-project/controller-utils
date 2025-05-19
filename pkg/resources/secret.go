@@ -3,17 +3,19 @@ package resources
 import (
 	"fmt"
 
+	"maps"
+
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type SecretMutator struct {
-	Name      string
-	Namespace string
-	Data      map[string][]byte
-	Type      core.SecretType
-	meta      Mutator[client.Object]
+	Name       string
+	Namespace  string
+	Data       map[string][]byte
+	StringData map[string]string
+	Type       core.SecretType
+	meta       MetadataMutator
 }
 
 var _ Mutator[*core.Secret] = &SecretMutator{}
@@ -28,12 +30,22 @@ func NewSecretMutator(name, namespace string, data map[string][]byte, secretType
 	}
 }
 
+func NewSecretMutatorWithStringData(name, namespace string, stringData map[string]string, secretType core.SecretType, labels map[string]string, annotations map[string]string) Mutator[*core.Secret] {
+	return &SecretMutator{
+		Name:       name,
+		Namespace:  namespace,
+		StringData: stringData,
+		Type:       secretType,
+		meta:       NewMetadataMutator(labels, annotations),
+	}
+}
+
 func (m *SecretMutator) String() string {
 	return fmt.Sprintf("secret %s/%s", m.Namespace, m.Name)
 }
 
 func (m *SecretMutator) Empty() *core.Secret {
-	return &core.Secret{
+	s := &core.Secret{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
 			Kind:       "Secret",
@@ -42,17 +54,31 @@ func (m *SecretMutator) Empty() *core.Secret {
 			Name:      m.Name,
 			Namespace: m.Namespace,
 		},
-		Data: m.Data,
 		Type: m.Type,
 	}
+	if m.Data != nil {
+		s.Data = make(map[string][]byte, len(m.Data))
+		maps.Copy(s.Data, m.Data)
+	}
+	if m.StringData != nil {
+		s.StringData = make(map[string]string, len(m.StringData))
+		maps.Copy(s.StringData, m.StringData)
+	}
+	return s
 }
 
 func (m *SecretMutator) Mutate(s *core.Secret) error {
-	if s.Data == nil {
-		s.Data = make(map[string][]byte)
+	if m.Data != nil {
+		s.Data = make(map[string][]byte, len(m.Data))
+		maps.Copy(s.Data, m.Data)
 	}
-	for key, value := range m.Data {
-		s.Data[key] = value
+	if m.StringData != nil {
+		s.StringData = make(map[string]string, len(m.StringData))
+		maps.Copy(s.StringData, m.StringData)
 	}
 	return m.meta.Mutate(s)
+}
+
+func (m *SecretMutator) MetadataMutator() MetadataMutator {
+	return m.meta
 }

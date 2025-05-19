@@ -3,8 +3,6 @@ package resources
 import (
 	"fmt"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -12,7 +10,7 @@ import (
 type ServiceAccountMutator struct {
 	Name      string
 	Namespace string
-	meta      Mutator[client.Object]
+	meta      MetadataMutator
 }
 
 var _ Mutator[*core.ServiceAccount] = &ServiceAccountMutator{}
@@ -44,4 +42,8 @@ func (m *ServiceAccountMutator) Empty() *core.ServiceAccount {
 
 func (m *ServiceAccountMutator) Mutate(s *core.ServiceAccount) error {
 	return m.meta.Mutate(s)
+}
+
+func (m *ServiceAccountMutator) MetadataMutator() MetadataMutator {
+	return m.meta
 }

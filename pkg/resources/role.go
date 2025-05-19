@@ -3,8 +3,6 @@ package resources
 import (
 	"fmt"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -13,7 +11,7 @@ type RoleMutator struct {
 	Name      string
 	Namespace string
 	Rules     []v1.PolicyRule
-	meta      Mutator[client.Object]
+	meta      MetadataMutator
 }
 
 var _ Mutator[*v1.Role] = &RoleMutator{}
@@ -47,4 +45,8 @@ func (m *RoleMutator) Empty() *v1.Role {
 func (m *RoleMutator) Mutate(r *v1.Role) error {
 	r.Rules = m.Rules
 	return m.meta.Mutate(r)
+}
+
+func (m *RoleMutator) MetadataMutator() MetadataMutator {
+	return m.meta
 }

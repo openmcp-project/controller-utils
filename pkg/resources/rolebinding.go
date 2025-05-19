@@ -3,8 +3,6 @@ package resources
 import (
 	"fmt"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -14,7 +12,7 @@ type RoleBindingMutator struct {
 	Namespace string
 	Subjects  []v1.Subject
 	RoleRef   v1.RoleRef
-	meta      Mutator[client.Object]
+	meta      MetadataMutator
 }
 
 var _ Mutator[*v1.RoleBinding] = &RoleBindingMutator{}
@@ -50,4 +48,8 @@ func (m *RoleBindingMutator) Mutate(rb *v1.RoleBinding) error {
 	rb.Subjects = m.Subjects
 	rb.RoleRef = m.RoleRef
 	return m.meta.Mutate(rb)
+}
+
+func (m *RoleBindingMutator) MetadataMutator() MetadataMutator {
+	return m.meta
 }
