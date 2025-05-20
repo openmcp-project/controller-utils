@@ -52,15 +52,15 @@ func (m *metadataMutator) Mutate(res client.Object) error {
 	if m.Labels != nil {
 		if res.GetLabels() == nil {
 			res.SetLabels(make(map[string]string))
-			maps.Copy(res.GetLabels(), m.Labels)
 		}
+		maps.Copy(res.GetLabels(), m.Labels)
 	}
 
 	if m.Annotations != nil {
 		if res.GetAnnotations() == nil {
 			res.SetAnnotations(make(map[string]string))
-			maps.Copy(res.GetAnnotations(), m.Annotations)
 		}
+		maps.Copy(res.GetAnnotations(), m.Annotations)
 	}
 
 	if m.OwnerReferences != nil {
