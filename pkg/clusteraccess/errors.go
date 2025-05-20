@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/openmcp-project/controller-utils/pkg/pairs"
 )
 
 // FailIfNotManaged takes an object and a list of expected labels.
@@ -27,7 +29,7 @@ func FailIfNotManaged(obj client.Object, expectedLabels ...Label) error {
 
 // NewResourceNotManagedError creates a new ResourceNotManagedError.
 func NewResourceNotManagedError(obj client.Object, expectedLabels ...Label) *ResourceNotManagedError {
-	SortLabels(expectedLabels)
+	pairs.Sort(expectedLabels)
 	return &ResourceNotManagedError{
 		Obj:            obj,
 		ExpectedLabels: expectedLabels,
@@ -55,7 +57,7 @@ func (e *ResourceNotManagedError) Error() string {
 		actualLabels = append(actualLabels, Label{Key: k, Value: v})
 	}
 	// Sort the labels for consistent error messages
-	SortLabels(actualLabels)
+	pairs.Sort(actualLabels)
 	return fmt.Sprintf("%s '%s%s' exists but does not contain the expected management labels %v, its actual labels are %v", kind, nsMod, e.Obj.GetName(), e.ExpectedLabels, actualLabels)
 }
 

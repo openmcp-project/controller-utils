@@ -15,8 +15,11 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/openmcp-project/controller-utils/pkg/pairs"
 	"github.com/openmcp-project/controller-utils/pkg/resources"
 )
+
+type Label = pairs.Pair[string, string]
 
 // GetTokenBasedAccess is a convenience function that wraps the flow of ensuring namespace, serviceaccount, (cluster)role(binding), and creating the token.
 // It returns a kubeconfig, the token with expiration timestamp, and an error if any of the steps fail.
@@ -85,7 +88,7 @@ func EnsureNamespace(ctx context.Context, c client.Client, nsName string, expect
 		// a namespace does not have any spec, so we don't have to do anything, if it was found
 		return ns, nil
 	}
-	ns.SetLabels(LabelListToMap(expectedLabels))
+	ns.SetLabels(pairs.PairsToMap(expectedLabels))
 	if err := c.Create(ctx, ns); err != nil {
 		return nil, fmt.Errorf("error creating Namespace '%s': %w", ns.Name, err)
 	}
@@ -115,7 +118,7 @@ func EnsureServiceAccount(ctx context.Context, c client.Client, saName, saNamesp
 		// a serviceaccount does not have any relevant spec, so we don't have to do anything, if it was found
 		return sa, nil
 	}
-	sa.SetLabels(LabelListToMap(expectedLabels))
+	sa.SetLabels(pairs.PairsToMap(expectedLabels))
 	if err := c.Create(ctx, sa); err != nil {
 		return nil, fmt.Errorf("error creating ServiceAccount '%s': %w", sa.Name, err)
 	}
@@ -143,7 +146,7 @@ func EnsureClusterRoleAndBinding(ctx context.Context, c client.Client, name stri
 // The ClusterRole is returned.
 func EnsureClusterRole(ctx context.Context, c client.Client, name string, rules []rbacv1.PolicyRule, expectedLabels ...Label) (*rbacv1.ClusterRole, error) {
 	crm := resources.NewClusterRoleMutator(name, rules)
-	crm.MetadataMutator().WithLabels(LabelListToMap(expectedLabels))
+	crm.MetadataMutator().WithLabels(pairs.PairsToMap(expectedLabels))
 	cr := crm.Empty()
 	found := true
 	if err := c.Get(ctx, client.ObjectKeyFromObject(cr), cr); err != nil {
@@ -169,7 +172,7 @@ func EnsureClusterRole(ctx context.Context, c client.Client, name string, rules 
 // The ClusterRoleBinding is returned.
 func EnsureClusterRoleBinding(ctx context.Context, c client.Client, name, clusterRoleName string, subjects []rbacv1.Subject, expectedLabels ...Label) (*rbacv1.ClusterRoleBinding, error) {
 	crbm := resources.NewClusterRoleBindingMutator(name, subjects, resources.NewClusterRoleRef(clusterRoleName))
-	crbm.MetadataMutator().WithLabels(LabelListToMap(expectedLabels))
+	crbm.MetadataMutator().WithLabels(pairs.PairsToMap(expectedLabels))
 	crb := crbm.Empty()
 	found := true
 	if err := c.Get(ctx, client.ObjectKeyFromObject(crb), crb); err != nil {
@@ -209,7 +212,7 @@ func EnsureRoleAndBinding(ctx context.Context, c client.Client, name, namespace 
 // The Role is returned.
 func EnsureRole(ctx context.Context, c client.Client, name, namespace string, rules []rbacv1.PolicyRule, expectedLabels ...Label) (*rbacv1.Role, error) {
 	rm := resources.NewRoleMutator(name, namespace, rules)
-	rm.MetadataMutator().WithLabels(LabelListToMap(expectedLabels))
+	rm.MetadataMutator().WithLabels(pairs.PairsToMap(expectedLabels))
 	r := rm.Empty()
 	found := true
 	if err := c.Get(ctx, client.ObjectKeyFromObject(r), r); err != nil {
@@ -235,7 +238,7 @@ func EnsureRole(ctx context.Context, c client.Client, name, namespace string, ru
 // The RoleBinding is returned.
 func EnsureRoleBinding(ctx context.Context, c client.Client, name, namespace, roleName string, subjects []rbacv1.Subject, expectedLabels ...Label) (*rbacv1.RoleBinding, error) {
 	rbm := resources.NewRoleBindingMutator(name, namespace, subjects, resources.NewRoleRef(roleName))
-	rbm.MetadataMutator().WithLabels(LabelListToMap(expectedLabels))
+	rbm.MetadataMutator().WithLabels(pairs.PairsToMap(expectedLabels))
 	rb := rbm.Empty()
 	found := true
 	if err := c.Get(ctx, client.ObjectKeyFromObject(rb), rb); err != nil {

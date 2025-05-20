@@ -10,6 +10,7 @@
 - [Custom Resource Definitions](libs/crds.md)
 - [Error Handling](libs/errors.md)
 - [Logging](libs/logging.md)
+- [Key-Value Pairs](libs/pairs.md)
 - [Readiness Checks](libs/readiness.md)
 - [Kubernetes Resource Management](libs/resource.md)
 - [Kubernetes Resource Status Updating](libs/status.md)

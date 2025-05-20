@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/openmcp-project/controller-utils/pkg/clusteraccess"
+	"github.com/openmcp-project/controller-utils/pkg/pairs"
 	testutils "github.com/openmcp-project/controller-utils/pkg/testing"
 )
 
@@ -18,7 +19,7 @@ var testLabelsMap = map[string]string{
 	"label1": "value1",
 	"label2": "value2",
 }
-var testLabelsList = clusteraccess.LabelMapToList(testLabelsMap)
+var testLabelsList = pairs.MapToPairs(testLabelsMap)
 
 var _ = Describe("ClusterAccess", func() {
 
