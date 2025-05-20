@@ -142,7 +142,8 @@ func EnsureClusterRoleAndBinding(ctx context.Context, c client.Client, name stri
 // If it exists, but does not have the expected labels, a ResourceNotManagedError is returned.
 // The ClusterRole is returned.
 func EnsureClusterRole(ctx context.Context, c client.Client, name string, rules []rbacv1.PolicyRule, expectedLabels ...Label) (*rbacv1.ClusterRole, error) {
-	crm := resources.NewClusterRoleMutator(name, rules, LabelListToMap(expectedLabels), nil)
+	crm := resources.NewClusterRoleMutator(name, rules)
+	crm.MetadataMutator().WithLabels(LabelListToMap(expectedLabels))
 	cr := crm.Empty()
 	found := true
 	if err := c.Get(ctx, client.ObjectKeyFromObject(cr), cr); err != nil {
@@ -167,7 +168,8 @@ func EnsureClusterRole(ctx context.Context, c client.Client, name string, rules 
 // If it exists, but does not have the expected labels, a ResourceNotManagedError is returned.
 // The ClusterRoleBinding is returned.
 func EnsureClusterRoleBinding(ctx context.Context, c client.Client, name, clusterRoleName string, subjects []rbacv1.Subject, expectedLabels ...Label) (*rbacv1.ClusterRoleBinding, error) {
-	crbm := resources.NewClusterRoleBindingMutator(name, subjects, resources.NewClusterRoleRef(clusterRoleName), LabelListToMap(expectedLabels), nil)
+	crbm := resources.NewClusterRoleBindingMutator(name, subjects, resources.NewClusterRoleRef(clusterRoleName))
+	crbm.MetadataMutator().WithLabels(LabelListToMap(expectedLabels))
 	crb := crbm.Empty()
 	found := true
 	if err := c.Get(ctx, client.ObjectKeyFromObject(crb), crb); err != nil {
@@ -206,7 +208,8 @@ func EnsureRoleAndBinding(ctx context.Context, c client.Client, name, namespace 
 // If it exists, but does not have the expected labels, a ResourceNotManagedError is returned.
 // The Role is returned.
 func EnsureRole(ctx context.Context, c client.Client, name, namespace string, rules []rbacv1.PolicyRule, expectedLabels ...Label) (*rbacv1.Role, error) {
-	rm := resources.NewRoleMutator(name, namespace, rules, LabelListToMap(expectedLabels), nil)
+	rm := resources.NewRoleMutator(name, namespace, rules)
+	rm.MetadataMutator().WithLabels(LabelListToMap(expectedLabels))
 	r := rm.Empty()
 	found := true
 	if err := c.Get(ctx, client.ObjectKeyFromObject(r), r); err != nil {
@@ -231,7 +234,8 @@ func EnsureRole(ctx context.Context, c client.Client, name, namespace string, ru
 // If it exists, but does not have the expected labels, a ResourceNotManagedError is returned.
 // The RoleBinding is returned.
 func EnsureRoleBinding(ctx context.Context, c client.Client, name, namespace, roleName string, subjects []rbacv1.Subject, expectedLabels ...Label) (*rbacv1.RoleBinding, error) {
-	rbm := resources.NewRoleBindingMutator(name, namespace, subjects, resources.NewRoleRef(roleName), LabelListToMap(expectedLabels), nil)
+	rbm := resources.NewRoleBindingMutator(name, namespace, subjects, resources.NewRoleRef(roleName))
+	rbm.MetadataMutator().WithLabels(LabelListToMap(expectedLabels))
 	rb := rbm.Empty()
 	found := true
 	if err := c.Get(ctx, client.ObjectKeyFromObject(rb), rb); err != nil {
