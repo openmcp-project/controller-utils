@@ -40,7 +40,7 @@ func NewLinkedList[T any](elements ...T) *LinkedList[T] {
 	res.dummy.next = res.dummy
 	res.dummy.prev = res.dummy
 
-	res.abstractCollection.funcIterator = res.Iterator
+	res.funcIterator = res.Iterator
 	res.funcAdd = res.Add
 	res.funcClear = res.Clear
 	res.funcRemove = res.Remove

@@ -20,12 +20,12 @@ var _ = Describe("Annotation/Label Library", func() {
 		Context("IsMetadataEntryAlreadyExistsError", func() {
 
 			It("should return true if the error is of type IsMetadataEntryAlreadyExistsError", func() {
-				var err error = ctrlutils.NewMetadataEntryAlreadyExistsError(ctrlutils.ANNOTATION, "test-annotation", "desired-value", "actual-value")
+				err := ctrlutils.NewMetadataEntryAlreadyExistsError(ctrlutils.ANNOTATION, "test-annotation", "desired-value", "actual-value")
 				Expect(ctrlutils.IsMetadataEntryAlreadyExistsError(err)).To(BeTrue())
 			})
 
 			It("should return false if the error is not of type IsMetadataEntryAlreadyExistsError", func() {
-				var err error = fmt.Errorf("test-error")
+				err := fmt.Errorf("test-error")
 				Expect(ctrlutils.IsMetadataEntryAlreadyExistsError(err)).To(BeFalse())
 			})
 
@@ -213,12 +213,12 @@ var _ = Describe("Annotation/Label Library", func() {
 		Context("IsMetadataEntryAlreadyExistsError", func() {
 
 			It("should return true if the error is of type IsMetadataEntryAlreadyExistsError", func() {
-				var err error = ctrlutils.NewMetadataEntryAlreadyExistsError(ctrlutils.LABEL, "test-label", "desired-value", "actual-value")
+				err := ctrlutils.NewMetadataEntryAlreadyExistsError(ctrlutils.LABEL, "test-label", "desired-value", "actual-value")
 				Expect(ctrlutils.IsMetadataEntryAlreadyExistsError(err)).To(BeTrue())
 			})
 
 			It("should return false if the error is not of type IsMetadataEntryAlreadyExistsError", func() {
-				var err error = fmt.Errorf("test-error")
+				err := fmt.Errorf("test-error")
 				Expect(ctrlutils.IsMetadataEntryAlreadyExistsError(err)).To(BeFalse())
 			})
 

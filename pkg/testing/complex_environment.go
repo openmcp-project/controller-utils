@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"time"
 
-	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -61,7 +61,7 @@ func (e *ComplexEnvironment) ShouldReconcile(reconciler string, req reconcile.Re
 
 func (e *ComplexEnvironment) shouldReconcile(reconciler string, req reconcile.Request, optionalDescription ...interface{}) reconcile.Result {
 	res, err := e.Reconcilers[reconciler].Reconcile(e.Ctx, req)
-	ExpectWithOffset(2, err).ToNot(HaveOccurred(), optionalDescription...)
+	gomega.ExpectWithOffset(2, err).ToNot(gomega.HaveOccurred(), optionalDescription...)
 	return res
 }
 
@@ -73,10 +73,10 @@ func (e *ComplexEnvironment) ShouldEventuallyReconcile(reconciler string, req re
 func (e *ComplexEnvironment) shouldEventuallyReconcile(reconciler string, req reconcile.Request, timeout, poll time.Duration, optionalDescription ...interface{}) reconcile.Result {
 	var err error
 	var res reconcile.Result
-	EventuallyWithOffset(1, func() error {
+	gomega.EventuallyWithOffset(1, func() error {
 		res, err = e.Reconcilers[reconciler].Reconcile(e.Ctx, req)
 		return err
-	}, timeout, poll).Should(Succeed(), optionalDescription...)
+	}, timeout, poll).Should(gomega.Succeed(), optionalDescription...)
 	return res
 }
 
@@ -87,7 +87,7 @@ func (e *ComplexEnvironment) ShouldNotReconcile(reconciler string, req reconcile
 
 func (e *ComplexEnvironment) shouldNotReconcile(reconciler string, req reconcile.Request, optionalDescription ...interface{}) reconcile.Result {
 	res, err := e.Reconcilers[reconciler].Reconcile(e.Ctx, req)
-	ExpectWithOffset(2, err).To(HaveOccurred(), optionalDescription...)
+	gomega.ExpectWithOffset(2, err).To(gomega.HaveOccurred(), optionalDescription...)
 	return res
 }
 
@@ -99,10 +99,10 @@ func (e *ComplexEnvironment) ShouldEventuallyNotReconcile(reconciler string, req
 func (e *ComplexEnvironment) shouldEventuallyNotReconcile(reconciler string, req reconcile.Request, timeout, poll time.Duration, optionalDescription ...interface{}) reconcile.Result {
 	var err error
 	var res reconcile.Result
-	EventuallyWithOffset(1, func() error {
+	gomega.EventuallyWithOffset(1, func() error {
 		res, err = e.Reconcilers[reconciler].Reconcile(e.Ctx, req)
 		return err
-	}, timeout, poll).ShouldNot(Succeed(), optionalDescription...)
+	}, timeout, poll).ShouldNot(gomega.Succeed(), optionalDescription...)
 	return res
 }
 
