@@ -5,24 +5,23 @@ import (
 
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type ConfigMapMutator struct {
 	Name      string
 	Namespace string
 	Data      map[string]string
-	meta      Mutator[client.Object]
+	meta      MetadataMutator
 }
 
 var _ Mutator[*core.ConfigMap] = &ConfigMapMutator{}
 
-func NewConfigMapMutator(name, namespace string, data map[string]string, labels map[string]string, annotations map[string]string) Mutator[*core.ConfigMap] {
+func NewConfigMapMutator(name, namespace string, data map[string]string) Mutator[*core.ConfigMap] {
 	return &ConfigMapMutator{
 		Name:      name,
 		Namespace: namespace,
 		Data:      data,
-		meta:      NewMetadataMutator(labels, annotations),
+		meta:      NewMetadataMutator(),
 	}
 }
 
@@ -52,4 +51,8 @@ func (m *ConfigMapMutator) Mutate(cm *core.ConfigMap) error {
 		cm.Data[key] = value
 	}
 	return m.meta.Mutate(cm)
+}
+
+func (m *ConfigMapMutator) MetadataMutator() MetadataMutator {
+	return m.meta
 }

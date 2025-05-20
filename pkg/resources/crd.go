@@ -3,21 +3,19 @@ package resources
 import (
 	"fmt"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type crdMutator struct {
 	crd  *apiextv1.CustomResourceDefinition
-	meta Mutator[client.Object]
+	meta MetadataMutator
 }
 
 var _ Mutator[*apiextv1.CustomResourceDefinition] = &crdMutator{}
 
-func NewCRDMutator(crd *apiextv1.CustomResourceDefinition, labels map[string]string, annotations map[string]string) Mutator[*apiextv1.CustomResourceDefinition] {
-	return &crdMutator{crd: crd, meta: NewMetadataMutator(labels, annotations)}
+func NewCRDMutator(crd *apiextv1.CustomResourceDefinition) Mutator[*apiextv1.CustomResourceDefinition] {
+	return &crdMutator{crd: crd, meta: NewMetadataMutator()}
 }
 
 func (m *crdMutator) String() string {
@@ -39,4 +37,8 @@ func (m *crdMutator) Empty() *apiextv1.CustomResourceDefinition {
 func (m *crdMutator) Mutate(r *apiextv1.CustomResourceDefinition) error {
 	m.crd.Spec.DeepCopyInto(&r.Spec)
 	return m.meta.Mutate(r)
+}
+
+func (m *crdMutator) MetadataMutator() MetadataMutator {
+	return m.meta
 }

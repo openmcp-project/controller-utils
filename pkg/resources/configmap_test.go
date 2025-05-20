@@ -42,7 +42,8 @@ var _ = Describe("ConfigMapMutator", func() {
 		annotations = map[string]string{"annotation1": "value1"}
 
 		// Create a ConfigMap mutator
-		mutator = resources.NewConfigMapMutator("test-configmap", "test-namespace", data, labels, annotations)
+		mutator = resources.NewConfigMapMutator("test-configmap", "test-namespace", data)
+		mutator.MetadataMutator().WithLabels(labels).WithAnnotations(annotations)
 	})
 
 	It("should create an empty ConfigMap with correct metadata", func() {

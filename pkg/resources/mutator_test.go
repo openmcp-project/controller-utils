@@ -42,7 +42,8 @@ var _ = Describe("Resource Functions", func() {
 		data = map[string]string{"key1": "value1", "key2": "value2"}
 
 		// Create a ConfigMap mutator
-		mutator = resources.NewConfigMapMutator("test-configmap", "test-namespace", data, labels, annotations)
+		mutator = resources.NewConfigMapMutator("test-configmap", "test-namespace", data)
+		mutator.MetadataMutator().WithLabels(labels).WithAnnotations(annotations)
 	})
 
 	It("should get, create or update, and delete a resource", func() {

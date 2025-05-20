@@ -9,12 +9,15 @@ Create or update a `ConfigMap`, a `ServiceAccount` and a `Deployment` using the 
 
 ```go
 type myDeploymentMutator struct {
+	meta MetadataMutator
 }
 
 var _ resource.Mutator[*appsv1.Deployment] = &myDeploymentMutator{}
 
-func newDeploymentMutator() resources.Mutator[*appsv1.Deployment] {
-	return &MyDeploymentMutator{}
+func newDeploymentMutator() resource.Mutator[*appsv1.Deployment] {
+	return &MyDeploymentMutator{
+		meta: NewMetadataMutator()
+	}
 }
 
 func (m *MyDeploymentMutator) String() string {
@@ -38,17 +41,22 @@ func (m *MyDeploymentMutator) Mutate(deployment *appsv1.Deployment) error {
 			Image: "test-image:latest",
 		},
 	}
-	return nil
+	return m.meta.Mutate(deployment)
+}
+
+func (m *MyDeploymentMutator) MetadataMutator() resource.MetadataMutator {
+	return m.meta
 }
 
 
 func ReconcileResources(ctx context.Context, client client.Client) error {
-	configMapResource := resource.NewConfigMap("my-configmap", "my-namespace", map[string]string{
+	configMapResource := resource.NewConfigMapMutator("my-configmap", "my-namespace")
+	configMapResource.MetadataMutator().WithLabels(map[string]string{
 		"label1": "value1",
 		"label2": "value2",
-	}, nil)
+	})
 
-	serviceAccountResource := resource.NewServiceAccount("my-serviceaccount", "my-namespace", nil, nil)
+	serviceAccountResource := resource.NewServiceAccountMutator("my-serviceaccount", "my-namespace")
 	
 	myDeploymentMutator := newDeploymentMutator()
 	

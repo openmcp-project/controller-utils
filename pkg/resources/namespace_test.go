@@ -40,7 +40,8 @@ var _ = Describe("NamespaceMutator", func() {
 		annotations = map[string]string{"annotation1": "value1"}
 
 		// Create a namespace mutator
-		mutator = resources.NewNamespaceMutator("test-namespace", labels, annotations)
+		mutator = resources.NewNamespaceMutator("test-namespace")
+		mutator.MetadataMutator().WithLabels(labels).WithAnnotations(annotations)
 	})
 
 	It("should create an empty namespace with correct metadata", func() {

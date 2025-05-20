@@ -48,7 +48,8 @@ var _ = Describe("RoleMutator", func() {
 		annotations = map[string]string{"annotation1": "value1"}
 
 		// Create a role mutator
-		mutator = resources.NewRoleMutator("test-role", "test-namespace", rules, labels, annotations)
+		mutator = resources.NewRoleMutator("test-role", "test-namespace", rules)
+		mutator.MetadataMutator().WithLabels(labels).WithAnnotations(annotations)
 	})
 
 	It("should create an empty role with correct metadata", func() {

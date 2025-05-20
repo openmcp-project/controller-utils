@@ -57,7 +57,9 @@ func (m *CRDManager) CreateOrUpdateCRDs(ctx context.Context, log *logging.Logger
 		if log != nil {
 			log.Info("creating/updating CRD", "name", crd.Name, "cluster", c.ID())
 		}
-		err = resources.CreateOrUpdateResource(ctx, c.Client(), resources.NewCRDMutator(crd, crd.Labels, crd.Annotations))
+		m := resources.NewCRDMutator(crd)
+		m.MetadataMutator().WithLabels(crd.Labels).WithAnnotations(crd.Annotations)
+		err = resources.CreateOrUpdateResource(ctx, c.Client(), m)
 		errs = errors.Join(errs, err)
 	}
 

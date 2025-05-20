@@ -48,7 +48,8 @@ var _ = Describe("ClusterRoleMutator", func() {
 		annotations = map[string]string{"annotation1": "value1"}
 
 		// Create a cluster role mutator
-		mutator = resources.NewClusterRoleMutator("test-clusterrole", rules, labels, annotations)
+		mutator = resources.NewClusterRoleMutator("test-clusterrole", rules)
+		mutator.MetadataMutator().WithLabels(labels).WithAnnotations(annotations)
 	})
 
 	It("should create an empty cluster role with correct metadata", func() {

@@ -3,8 +3,6 @@ package resources
 import (
 	"fmt"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	v1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -13,17 +11,17 @@ type ClusterRoleBindingMutator struct {
 	ClusterRoleBindingName string
 	RoleRef                v1.RoleRef
 	Subjects               []v1.Subject
-	meta                   Mutator[client.Object]
+	meta                   MetadataMutator
 }
 
 var _ Mutator[*v1.ClusterRoleBinding] = &ClusterRoleBindingMutator{}
 
-func NewClusterRoleBindingMutator(clusterRoleBindingName string, subjects []v1.Subject, roleRef v1.RoleRef, labels map[string]string, annotations map[string]string) Mutator[*v1.ClusterRoleBinding] {
+func NewClusterRoleBindingMutator(clusterRoleBindingName string, subjects []v1.Subject, roleRef v1.RoleRef) Mutator[*v1.ClusterRoleBinding] {
 	return &ClusterRoleBindingMutator{
 		ClusterRoleBindingName: clusterRoleBindingName,
 		RoleRef:                roleRef,
 		Subjects:               subjects,
-		meta:                   NewMetadataMutator(labels, annotations),
+		meta:                   NewMetadataMutator(),
 	}
 }
 
@@ -47,4 +45,8 @@ func (m *ClusterRoleBindingMutator) Mutate(r *v1.ClusterRoleBinding) error {
 	r.RoleRef = m.RoleRef
 	r.Subjects = m.Subjects
 	return m.meta.Mutate(r)
+}
+
+func (m *ClusterRoleBindingMutator) MetadataMutator() MetadataMutator {
+	return m.meta
 }
