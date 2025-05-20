@@ -3,6 +3,7 @@
 
 ## Libraries
 
+- [Generating Kubeconfigs for k8s Clusters](libs/clusteraccess.md)
 - [Connecting to Kubernetes Clusters](libs/clusters.md)
 - [Collections](libs/collections.md)
 - [Controller Utility Functions](libs/controller.md)
