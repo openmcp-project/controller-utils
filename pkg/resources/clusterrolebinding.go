@@ -16,12 +16,12 @@ type ClusterRoleBindingMutator struct {
 
 var _ Mutator[*v1.ClusterRoleBinding] = &ClusterRoleBindingMutator{}
 
-func NewClusterRoleBindingMutator(clusterRoleBindingName string, subjects []v1.Subject, roleRef v1.RoleRef, labels map[string]string, annotations map[string]string) Mutator[*v1.ClusterRoleBinding] {
+func NewClusterRoleBindingMutator(clusterRoleBindingName string, subjects []v1.Subject, roleRef v1.RoleRef) Mutator[*v1.ClusterRoleBinding] {
 	return &ClusterRoleBindingMutator{
 		ClusterRoleBindingName: clusterRoleBindingName,
 		RoleRef:                roleRef,
 		Subjects:               subjects,
-		meta:                   NewMetadataMutator(labels, annotations),
+		meta:                   NewMetadataMutator(),
 	}
 }
 

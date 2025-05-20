@@ -47,7 +47,8 @@ var _ = Describe("SecretMutator", func() {
 	})
 
 	It("should create an empty Secret with correct metadata", func() {
-		mutator = resources.NewSecretMutator("test-secret", "test-namespace", data, secretType, labels, annotations)
+		mutator = resources.NewSecretMutator("test-secret", "test-namespace", data, secretType)
+		mutator.MetadataMutator().WithLabels(labels).WithAnnotations(annotations)
 		secret := mutator.Empty()
 
 		Expect(secret.Name).To(Equal("test-secret"))
@@ -60,7 +61,8 @@ var _ = Describe("SecretMutator", func() {
 	})
 
 	It("should create an empty Secret with correct metadata (string data)", func() {
-		mutator = resources.NewSecretMutatorWithStringData("test-secret", "test-namespace", stringData, secretType, labels, annotations)
+		mutator = resources.NewSecretMutatorWithStringData("test-secret", "test-namespace", stringData, secretType)
+		mutator.MetadataMutator().WithLabels(labels).WithAnnotations(annotations)
 		secret := mutator.Empty()
 
 		Expect(secret.Name).To(Equal("test-secret"))
@@ -73,7 +75,8 @@ var _ = Describe("SecretMutator", func() {
 	})
 
 	It("should apply data, labels, and annotations using Mutate", func() {
-		mutator = resources.NewSecretMutator("test-secret", "test-namespace", data, secretType, labels, annotations)
+		mutator = resources.NewSecretMutator("test-secret", "test-namespace", data, secretType)
+		mutator.MetadataMutator().WithLabels(labels).WithAnnotations(annotations)
 		secret := mutator.Empty()
 
 		// Apply the mutator's Mutate method
@@ -87,7 +90,8 @@ var _ = Describe("SecretMutator", func() {
 	})
 
 	It("should apply data, labels, and annotations using Mutate (string data)", func() {
-		mutator = resources.NewSecretMutatorWithStringData("test-secret", "test-namespace", stringData, secretType, labels, annotations)
+		mutator = resources.NewSecretMutatorWithStringData("test-secret", "test-namespace", stringData, secretType)
+		mutator.MetadataMutator().WithLabels(labels).WithAnnotations(annotations)
 		secret := mutator.Empty()
 
 		// Apply the mutator's Mutate method
@@ -101,7 +105,8 @@ var _ = Describe("SecretMutator", func() {
 	})
 
 	It("should create and retrieve the Secret using the fake client", func() {
-		mutator = resources.NewSecretMutator("test-secret", "test-namespace", data, secretType, labels, annotations)
+		mutator = resources.NewSecretMutator("test-secret", "test-namespace", data, secretType)
+		mutator.MetadataMutator().WithLabels(labels).WithAnnotations(annotations)
 		secret := mutator.Empty()
 		Expect(mutator.Mutate(secret)).To(Succeed())
 

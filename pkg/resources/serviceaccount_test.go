@@ -40,7 +40,8 @@ var _ = Describe("ServiceAccountMutator", func() {
 		annotations = map[string]string{"annotation1": "value1"}
 
 		// Create a ServiceAccount mutator
-		mutator = resources.NewServiceAccountMutator("test-serviceaccount", "test-namespace", labels, annotations)
+		mutator = resources.NewServiceAccountMutator("test-serviceaccount", "test-namespace")
+		mutator.MetadataMutator().WithLabels(labels).WithAnnotations(annotations)
 	})
 
 	It("should create an empty ServiceAccount with correct metadata", func() {

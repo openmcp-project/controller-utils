@@ -15,11 +15,11 @@ type ServiceAccountMutator struct {
 
 var _ Mutator[*core.ServiceAccount] = &ServiceAccountMutator{}
 
-func NewServiceAccountMutator(name, namespace string, labels map[string]string, annotations map[string]string) Mutator[*core.ServiceAccount] {
+func NewServiceAccountMutator(name, namespace string) Mutator[*core.ServiceAccount] {
 	return &ServiceAccountMutator{
 		Name:      name,
 		Namespace: namespace,
-		meta:      NewMetadataMutator(labels, annotations),
+		meta:      NewMetadataMutator(),
 	}
 }
 

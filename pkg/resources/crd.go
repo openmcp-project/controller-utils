@@ -14,8 +14,8 @@ type crdMutator struct {
 
 var _ Mutator[*apiextv1.CustomResourceDefinition] = &crdMutator{}
 
-func NewCRDMutator(crd *apiextv1.CustomResourceDefinition, labels map[string]string, annotations map[string]string) Mutator[*apiextv1.CustomResourceDefinition] {
-	return &crdMutator{crd: crd, meta: NewMetadataMutator(labels, annotations)}
+func NewCRDMutator(crd *apiextv1.CustomResourceDefinition) Mutator[*apiextv1.CustomResourceDefinition] {
+	return &crdMutator{crd: crd, meta: NewMetadataMutator()}
 }
 
 func (m *crdMutator) String() string {

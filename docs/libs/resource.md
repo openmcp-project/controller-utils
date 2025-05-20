@@ -14,9 +14,9 @@ type myDeploymentMutator struct {
 
 var _ resource.Mutator[*appsv1.Deployment] = &myDeploymentMutator{}
 
-func newDeploymentMutator(labels map[string]string, annotations map[string]string) resource.Mutator[*appsv1.Deployment] {
+func newDeploymentMutator() resource.Mutator[*appsv1.Deployment] {
 	return &MyDeploymentMutator{
-		meta: NewMetadataMutator(labels, annotations)
+		meta: NewMetadataMutator()
 	}
 }
 
@@ -44,18 +44,19 @@ func (m *MyDeploymentMutator) Mutate(deployment *appsv1.Deployment) error {
 	return m.meta.Mutate(deployment)
 }
 
-func (m *MyDeploymentMutator) MetadataMutator() MetadataMutator {
+func (m *MyDeploymentMutator) MetadataMutator() resource.MetadataMutator {
 	return m.meta
 }
 
 
 func ReconcileResources(ctx context.Context, client client.Client) error {
-	configMapResource := resource.NewConfigMap("my-configmap", "my-namespace", map[string]string{
+	configMapResource := resource.NewConfigMapMutator("my-configmap", "my-namespace")
+	configMapResource.MetadataMutator().WithLabels(map[string]string{
 		"label1": "value1",
 		"label2": "value2",
-	}, nil)
+	})
 
-	serviceAccountResource := resource.NewServiceAccount("my-serviceaccount", "my-namespace", nil, nil)
+	serviceAccountResource := resource.NewServiceAccountMutator("my-serviceaccount", "my-namespace")
 	
 	myDeploymentMutator := newDeploymentMutator()
 	

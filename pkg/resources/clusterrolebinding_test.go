@@ -50,7 +50,8 @@ var _ = Describe("ClusterRoleBindingMutator", func() {
 		annotations = map[string]string{"annotation1": "value1"}
 
 		// Create a cluster role binding mutator
-		mutator = resources.NewClusterRoleBindingMutator("test-clusterrolebinding", subjects, roleRef, labels, annotations)
+		mutator = resources.NewClusterRoleBindingMutator("test-clusterrolebinding", subjects, roleRef)
+		mutator.MetadataMutator().WithLabels(labels).WithAnnotations(annotations)
 	})
 
 	It("should create an empty cluster role binding with correct metadata", func() {

@@ -17,13 +17,13 @@ type RoleBindingMutator struct {
 
 var _ Mutator[*v1.RoleBinding] = &RoleBindingMutator{}
 
-func NewRoleBindingMutator(name, namespace string, subjects []v1.Subject, roleRef v1.RoleRef, labels map[string]string, annotations map[string]string) Mutator[*v1.RoleBinding] {
+func NewRoleBindingMutator(name, namespace string, subjects []v1.Subject, roleRef v1.RoleRef) Mutator[*v1.RoleBinding] {
 	return &RoleBindingMutator{
 		Name:      name,
 		Namespace: namespace,
 		Subjects:  subjects,
 		RoleRef:   roleRef,
-		meta:      NewMetadataMutator(labels, annotations),
+		meta:      NewMetadataMutator(),
 	}
 }
 

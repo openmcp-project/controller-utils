@@ -36,7 +36,13 @@ var _ = Describe("Metadata Mutator", func() {
 			},
 		}
 
-		m := resources.NewMetadataMutator(map[string]string{"newLabel": "new"}, map[string]string{"newAnnotation": "new"}).
+		m := resources.NewMetadataMutator().
+			WithLabels(map[string]string{
+				"newLabel": "new",
+			}).
+			WithAnnotations(map[string]string{
+				"newAnnotation": "new",
+			}).
 			WithOwnerReferences([]metav1.OwnerReference{
 				{
 					APIVersion: "v1",

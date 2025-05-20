@@ -14,8 +14,8 @@ type namespaceMutator struct {
 
 var _ Mutator[*v1.Namespace] = &namespaceMutator{}
 
-func NewNamespaceMutator(name string, labels map[string]string, annotations map[string]string) Mutator[*v1.Namespace] {
-	return &namespaceMutator{name: name, meta: NewMetadataMutator(labels, annotations)}
+func NewNamespaceMutator(name string) Mutator[*v1.Namespace] {
+	return &namespaceMutator{name: name, meta: NewMetadataMutator()}
 }
 
 func (m *namespaceMutator) String() string {

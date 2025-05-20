@@ -16,12 +16,12 @@ type ConfigMapMutator struct {
 
 var _ Mutator[*core.ConfigMap] = &ConfigMapMutator{}
 
-func NewConfigMapMutator(name, namespace string, data map[string]string, labels map[string]string, annotations map[string]string) Mutator[*core.ConfigMap] {
+func NewConfigMapMutator(name, namespace string, data map[string]string) Mutator[*core.ConfigMap] {
 	return &ConfigMapMutator{
 		Name:      name,
 		Namespace: namespace,
 		Data:      data,
-		meta:      NewMetadataMutator(labels, annotations),
+		meta:      NewMetadataMutator(),
 	}
 }
 

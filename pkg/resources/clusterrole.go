@@ -15,11 +15,11 @@ type ClusterRoleMutator struct {
 
 var _ Mutator[*v1.ClusterRole] = &ClusterRoleMutator{}
 
-func NewClusterRoleMutator(name string, rules []v1.PolicyRule, labels map[string]string, annotations map[string]string) Mutator[*v1.ClusterRole] {
+func NewClusterRoleMutator(name string, rules []v1.PolicyRule) Mutator[*v1.ClusterRole] {
 	return &ClusterRoleMutator{
 		Name:  name,
 		Rules: rules,
-		meta:  NewMetadataMutator(labels, annotations),
+		meta:  NewMetadataMutator(),
 	}
 }
 

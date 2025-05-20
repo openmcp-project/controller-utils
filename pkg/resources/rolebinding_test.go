@@ -50,7 +50,8 @@ var _ = Describe("RoleBindingMutator", func() {
 		annotations = map[string]string{"annotation1": "value1"}
 
 		// Create a role binding mutator
-		mutator = resources.NewRoleBindingMutator("test-rolebinding", "test-namespace", subjects, roleRef, labels, annotations)
+		mutator = resources.NewRoleBindingMutator("test-rolebinding", "test-namespace", subjects, roleRef)
+		mutator.MetadataMutator().WithLabels(labels).WithAnnotations(annotations)
 	})
 
 	It("should create an empty role binding with correct metadata", func() {

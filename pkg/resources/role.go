@@ -16,12 +16,12 @@ type RoleMutator struct {
 
 var _ Mutator[*v1.Role] = &RoleMutator{}
 
-func NewRoleMutator(name, namespace string, rules []v1.PolicyRule, labels map[string]string, annotations map[string]string) Mutator[*v1.Role] {
+func NewRoleMutator(name, namespace string, rules []v1.PolicyRule) Mutator[*v1.Role] {
 	return &RoleMutator{
 		Name:      name,
 		Namespace: namespace,
 		Rules:     rules,
-		meta:      NewMetadataMutator(labels, annotations),
+		meta:      NewMetadataMutator(),
 	}
 }
 

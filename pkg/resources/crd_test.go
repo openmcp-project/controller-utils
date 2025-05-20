@@ -61,7 +61,8 @@ var _ = Describe("CRDMutator", func() {
 		}
 
 		// Create a CRD mutator
-		mutator = resources.NewCRDMutator(crd, labels, annotations)
+		mutator = resources.NewCRDMutator(crd)
+		mutator.MetadataMutator().WithLabels(labels).WithAnnotations(annotations)
 	})
 
 	It("should create an empty CRD with correct metadata", func() {

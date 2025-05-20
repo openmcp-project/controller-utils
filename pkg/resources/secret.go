@@ -20,23 +20,23 @@ type SecretMutator struct {
 
 var _ Mutator[*core.Secret] = &SecretMutator{}
 
-func NewSecretMutator(name, namespace string, data map[string][]byte, secretType core.SecretType, labels map[string]string, annotations map[string]string) Mutator[*core.Secret] {
+func NewSecretMutator(name, namespace string, data map[string][]byte, secretType core.SecretType) Mutator[*core.Secret] {
 	return &SecretMutator{
 		Name:      name,
 		Namespace: namespace,
 		Data:      data,
 		Type:      secretType,
-		meta:      NewMetadataMutator(labels, annotations),
+		meta:      NewMetadataMutator(),
 	}
 }
 
-func NewSecretMutatorWithStringData(name, namespace string, stringData map[string]string, secretType core.SecretType, labels map[string]string, annotations map[string]string) Mutator[*core.Secret] {
+func NewSecretMutatorWithStringData(name, namespace string, stringData map[string]string, secretType core.SecretType) Mutator[*core.Secret] {
 	return &SecretMutator{
 		Name:       name,
 		Namespace:  namespace,
 		StringData: stringData,
 		Type:       secretType,
-		meta:       NewMetadataMutator(labels, annotations),
+		meta:       NewMetadataMutator(),
 	}
 }
 

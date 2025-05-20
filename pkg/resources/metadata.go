@@ -18,16 +18,25 @@ type MetadataMutator interface {
 	Mutator[client.Object]
 	WithOwnerReferences(ownerReferences []metav1.OwnerReference) MetadataMutator
 	WithFinalizers(finalizers []string) MetadataMutator
+	WithLabels(labels map[string]string) MetadataMutator
+	WithAnnotations(annotations map[string]string) MetadataMutator
 }
 
 var _ Mutator[client.Object] = &metadataMutator{}
 var _ MetadataMutator = &metadataMutator{}
 
-func NewMetadataMutator(labels map[string]string, annotations map[string]string) MetadataMutator {
-	return &metadataMutator{
-		Labels:      labels,
-		Annotations: annotations,
-	}
+func NewMetadataMutator() MetadataMutator {
+	return &metadataMutator{}
+}
+
+func (m *metadataMutator) WithLabels(labels map[string]string) MetadataMutator {
+	m.Labels = labels
+	return m
+}
+
+func (m *metadataMutator) WithAnnotations(annotations map[string]string) MetadataMutator {
+	m.Annotations = annotations
+	return m
 }
 
 func (m *metadataMutator) WithOwnerReferences(ownerReferences []metav1.OwnerReference) MetadataMutator {
