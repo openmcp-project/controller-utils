@@ -64,6 +64,16 @@ var _ = Describe("Status Updater", func() {
 		))
 	})
 
+	It("should not hide a reconciliation error if the object is nil", func() {
+		env := testutils.NewEnvironmentBuilder().WithFakeClient(coScheme).WithInitObjectPath("testdata", "test-02").WithDynamicObjectsWithStatus(&CustomObject{}).Build()
+		rr := controller.ReconcileResult[*CustomObject, ConditionStatus]{
+			ReconcileError: errors.WithReason(fmt.Errorf("test error"), "TestError"),
+		}
+		su := preconfiguredStatusUpdaterBuilder().Build()
+		_, err := su.UpdateStatus(env.Ctx, env.Client(), rr)
+		Expect(err).To(HaveOccurred())
+	})
+
 	It("should update an existing status", func() {
 		env := testutils.NewEnvironmentBuilder().WithFakeClient(coScheme).WithInitObjectPath("testdata", "test-02").WithDynamicObjectsWithStatus(&CustomObject{}).Build()
 		obj := &CustomObject{}
