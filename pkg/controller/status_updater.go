@@ -177,11 +177,12 @@ func defaultPhaseUpdateFunc[Obj client.Object, PhType ~string, ConType comparabl
 // The object is expected to be a pointer to a struct with the status field.
 // If the 'Object' field in the ReconcileResult is nil, the status update becomes a no-op.
 func (s *statusUpdater[Obj, PhType, ConType]) UpdateStatus(ctx context.Context, c client.Client, rr ReconcileResult[Obj, ConType]) (ctrl.Result, error) {
+	errs := errors.NewReasonableErrorList(rr.ReconcileError)
 	if IsNil(rr.Object) {
-		return rr.Result, nil
+		return rr.Result, errs.Aggregate()
 	}
 	if s.fieldNames[STATUS_FIELD] == "" {
-		return rr.Result, nil
+		return rr.Result, errs.Aggregate()
 	}
 	if IsNil(rr.OldObject) || IsSameObject(rr.OldObject, rr.Object) {
 		// create old object based on given one
@@ -189,10 +190,10 @@ func (s *statusUpdater[Obj, PhType, ConType]) UpdateStatus(ctx context.Context, 
 	}
 	status := GetField(rr.Object, s.fieldNames[STATUS_FIELD], true)
 	if IsNil(status) {
-		return rr.Result, fmt.Errorf("unable to get pointer to status field '%s' of object %T", s.fieldNames[STATUS_FIELD], rr.Object)
+		errs.Append(errors.WithReason(fmt.Errorf("unable to get pointer to status field '%s' of object %T", s.fieldNames[STATUS_FIELD], rr.Object), "InternalError"))
+		return rr.Result, errs.Aggregate()
 	}
 
-	errs := errors.NewReasonableErrorList(rr.ReconcileError)
 	now := time.Now()
 	if s.fieldNames[STATUS_FIELD_LAST_RECONCILE_TIME] != "" {
 		SetField(status, s.fieldNames[STATUS_FIELD_LAST_RECONCILE_TIME], metav1.NewTime(now))
