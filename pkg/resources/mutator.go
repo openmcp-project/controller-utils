@@ -15,9 +15,9 @@ type Mutator[K client.Object] interface {
 	MetadataMutator() MetadataMutator
 }
 
-func GetResource[K client.Object](ctx context.Context, clt client.Client, m Mutator[K]) (K, error) {
+func GetResource[K client.Object](ctx context.Context, clt client.Client, m Mutator[K], opts ...client.GetOption) (K, error) {
 	res := m.Empty()
-	if err := clt.Get(ctx, client.ObjectKeyFromObject(res), res); err != nil {
+	if err := clt.Get(ctx, client.ObjectKeyFromObject(res), res, opts...); err != nil {
 		return res, fmt.Errorf("failed to get %s: %w", m.String(), err)
 	}
 	return res, nil
@@ -34,9 +34,9 @@ func CreateOrUpdateResource[K client.Object](ctx context.Context, clt client.Cli
 	return nil
 }
 
-func DeleteResource[K client.Object](ctx context.Context, clt client.Client, m Mutator[K]) error {
+func DeleteResource[K client.Object](ctx context.Context, clt client.Client, m Mutator[K], opts ...client.DeleteOption) error {
 	res := m.Empty()
-	if err := clt.Delete(ctx, res); client.IgnoreNotFound(err) != nil {
+	if err := clt.Delete(ctx, res, opts...); client.IgnoreNotFound(err) != nil {
 		return fmt.Errorf("failed to delete %s: %w", m.String(), err)
 	}
 	return nil
