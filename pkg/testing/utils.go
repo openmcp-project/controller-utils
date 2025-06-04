@@ -35,13 +35,13 @@ func ShouldNotReconcile(ctx context.Context, reconciler reconcile.Reconciler, re
 
 // ExpectRequeue expects the given result to indicate a requeue.
 func ExpectRequeue(res reconcile.Result) {
-	requeue := res.Requeue || res.RequeueAfter > 0
+	requeue := res.Requeue || res.RequeueAfter > 0 //nolint:staticcheck
 	gomega.ExpectWithOffset(1, requeue).To(gomega.BeTrue())
 }
 
 // ExpectNoRequeue expects the given result to indicate no requeue.
 func ExpectNoRequeue(res reconcile.Result) {
-	requeue := res.Requeue || res.RequeueAfter > 0
+	requeue := res.Requeue || res.RequeueAfter > 0 //nolint:staticcheck
 	gomega.ExpectWithOffset(1, requeue).To(gomega.BeFalse())
 }
 
