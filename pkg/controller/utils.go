@@ -52,3 +52,27 @@ func ObjectKey(name string, maybeNamespace ...string) client.ObjectKey {
 		Name:      name,
 	}
 }
+
+// RemoveFinalizerWithPrefix removes the first finalizer with the given prefix from the object.
+// The bool return value indicates whether a finalizer was removed.
+// If it is true, the string return value holds the suffix of the removed finalizer.
+// The logic is based on the controller-runtime's RemoveFinalizer function.
+func RemoveFinalizerWithPrefix(obj client.Object, prefix string) (string, bool) {
+	fins := obj.GetFinalizers()
+	length := len(fins)
+	suffix := ""
+	found := false
+
+	index := 0
+	for i := range length {
+		if !found && strings.HasPrefix(fins[i], prefix) {
+			suffix = strings.TrimPrefix(fins[i], prefix)
+			found = true
+			continue
+		}
+		fins[index] = fins[i]
+		index++
+	}
+	obj.SetFinalizers(fins[:index])
+	return suffix, length != index
+}

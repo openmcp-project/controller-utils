@@ -7,7 +7,7 @@ import (
 	"github.com/openmcp-project/controller-utils/pkg/collections/maps"
 )
 
-var _ = Describe("LinkedIterator Tests", func() {
+var _ = Describe("Map Utils Tests", func() {
 
 	Context("Merge", func() {
 
@@ -56,6 +56,58 @@ var _ = Describe("LinkedIterator Tests", func() {
 
 			intersected = maps.Intersect(map[string]string{}, map[string]string{"foo": "bar"})
 			Expect(intersected).To(BeEmpty())
+		})
+
+	})
+
+	Context("MapKeys", func() {
+
+		It("should return all keys in the map", func() {
+			m1 := map[string]string{"foo": "bar", "bar": "baz", "foobar": "foobaz"}
+			keys := maps.MapKeys(m1)
+			Expect(keys).To(ConsistOf("foo", "bar", "foobar"))
+			Expect(len(keys)).To(Equal(3))
+		})
+
+		It("should return an empty slice for an empty or nil map", func() {
+			var nilMap map[string]string
+			Expect(maps.MapKeys(nilMap)).To(BeEmpty())
+			Expect(maps.MapKeys(map[string]string{})).To(BeEmpty())
+		})
+
+	})
+
+	Context("MapValues", func() {
+
+		It("should return all values in the map", func() {
+			m1 := map[string]string{"foo": "bar", "bar": "baz", "foobar": "foobaz"}
+			values := maps.MapValues(m1)
+			Expect(values).To(ConsistOf("bar", "baz", "foobaz"))
+			Expect(len(values)).To(Equal(3))
+		})
+
+		It("should return an empty slice for an empty or nil map", func() {
+			var nilMap map[string]string
+			Expect(maps.MapValues(nilMap)).To(BeEmpty())
+			Expect(maps.MapValues(map[string]string{})).To(BeEmpty())
+		})
+
+	})
+
+	Context("GetAny", func() {
+
+		It("should return a key-value pair from the map", func() {
+			m1 := map[string]string{"foo": "bar", "bar": "baz", "foobar": "foobaz"}
+			pair := maps.GetAny(m1)
+			Expect(pair).ToNot(BeNil())
+			Expect(pair.Key).To(BeElementOf("foo", "bar", "foobar"))
+			Expect(m1[pair.Key]).To(Equal(pair.Value))
+		})
+
+		It("should return nil for an empty or nil map", func() {
+			var nilMap map[string]string
+			Expect(maps.GetAny(nilMap)).To(BeNil())
+			Expect(maps.GetAny(map[string]string{})).To(BeNil())
 		})
 
 	})
