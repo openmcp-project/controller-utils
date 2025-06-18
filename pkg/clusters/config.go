@@ -26,28 +26,28 @@ type oidcTrustConfig struct {
 //
 // spec:
 //
-//	 template:
-//	   spec:
-//		   volumes:
-//		     - name: oidc-trust-config
-//		       projected:
-//		         sources:
-//		           - secret:
-//		               name: oidc-trust-config
-//		               items:
-//		                 - key: host
-//		                   path: cluster/host
-//		                 - key: caData
-//	                       path: cluster/ca.crt
-//		           - serviceAccountToken:
-//		               audience: target-cluster
-//	                   path: cluster/token
-//	                   expirationSeconds: 3600
+//	template:
+//	  spec:
+//	    volumes:
+//	    - name: oidc-trust-config
+//	      projected:
+//	        sources:
+//	        - secret:
+//	          name: oidc-trust-config
+//	          items:
+//	          - key: host
+//	            path: cluster/host
+//	          - key: caData
+//	            path: cluster/ca.crt
+//	        - serviceAccountToken:
+//	            audience: target-cluster
+//	            path: cluster/token
+//	            expirationSeconds: 3600
 //
-//		   volumeMounts:
-//		     - name: oidc-trust-config
-//		       mountPath: /var/run/secrets/oidc-trust-config
-//		       readOnly: true
+//	    volumeMounts:
+//	    - name: oidc-trust-config
+//	      mountPath: /var/run/secrets/oidc-trust-config
+//	      readOnly: true
 func (c *Cluster) MarshalOIDCConfig() ([]byte, error) {
 	if c.RESTConfig() == nil {
 		return nil, fmt.Errorf("cannot marshal OIDC trust config when RESTConfig is nil")
