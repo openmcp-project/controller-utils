@@ -3,6 +3,8 @@ package clusters
 import (
 	"fmt"
 
+	"github.com/openmcp-project/controller-utils/pkg/clusteraccess"
+
 	flag "github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -234,4 +236,26 @@ func (c *Cluster) APIServerEndpoint() string {
 		return ""
 	}
 	return c.restCfg.Host
+}
+
+/////////////////
+// Serializing //
+/////////////////
+
+// WriteKubeconfig writes the cluster's kubeconfig to a byte slice.
+// see clusteraccess.WriteKubeconfigFromRESTConfig for details.
+func (c *Cluster) WriteKubeconfig() ([]byte, error) {
+	if c.restCfg == nil {
+		return nil, fmt.Errorf("cannot write kubeconfig for cluster when REST config is not set")
+	}
+	return clusteraccess.WriteKubeconfigFromRESTConfig(c.restCfg)
+}
+
+// WriteOIDCConfig writes the cluster's OIDC config to a byte slice.
+// see clusteraccess.WriteOIDCConfigFromRESTConfig for details.
+func (c *Cluster) WriteOIDCConfig() ([]byte, error) {
+	if c.restCfg == nil {
+		return nil, fmt.Errorf("cannot write OIDC config for cluster when REST config is not set")
+	}
+	return clusteraccess.WriteOIDCConfigFromRESTConfig(c.restCfg)
 }
