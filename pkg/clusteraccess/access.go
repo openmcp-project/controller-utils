@@ -403,7 +403,7 @@ func WriteOIDCConfigFromRESTConfig(restConfig *rest.Config) ([]byte, error) {
 func WriteKubeconfigFromRESTConfig(restConfig *rest.Config) ([]byte, error) {
 	var authInfo *clientapi.AuthInfo
 
-	contextName := "default"
+	id := "cluster"
 
 	type authType string
 	const (
@@ -454,21 +454,21 @@ func WriteKubeconfigFromRESTConfig(restConfig *rest.Config) ([]byte, error) {
 	}
 
 	kubeConfig := clientapi.Config{
-		CurrentContext: contextName,
+		CurrentContext: id,
 		Contexts: map[string]*clientapi.Context{
-			contextName: {
-				AuthInfo: contextName,
-				Cluster:  contextName,
+			id: {
+				AuthInfo: id,
+				Cluster:  id,
 			},
 		},
 		Clusters: map[string]*clientapi.Cluster{
-			contextName: {
+			id: {
 				Server:                   server,
 				CertificateAuthorityData: restConfig.CAData,
 			},
 		},
 		AuthInfos: map[string]*clientapi.AuthInfo{
-			contextName: authInfo,
+			id: authInfo,
 		},
 	}
 
