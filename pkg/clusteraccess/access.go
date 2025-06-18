@@ -13,7 +13,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	clientapi "k8s.io/client-go/tools/clientcmd/api"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -401,7 +400,7 @@ func WriteOIDCConfigFromRESTConfig(restConfig *rest.Config) ([]byte, error) {
 // WriteKubeconfigFromRESTConfig converts the RESTConfig to a kubeconfig format.
 // Supported authentication methods are Bearer Token, Username/Password and Client Certificate.
 func WriteKubeconfigFromRESTConfig(restConfig *rest.Config) ([]byte, error) {
-	var authInfo *clientapi.AuthInfo
+	var authInfo *clientcmdapi.AuthInfo
 
 	id := "cluster"
 
@@ -420,7 +419,7 @@ func WriteKubeconfigFromRESTConfig(restConfig *rest.Config) ([]byte, error) {
 		availableAuthTypes[authTypeBasicAuth] = nil
 	}
 
-	if restConfig.TLSClientConfig.CertData != nil && restConfig.TLSClientConfig.KeyData != nil {
+	if restConfig.CertData != nil && restConfig.KeyData != nil {
 		availableAuthTypes[authTypeClientCert] = nil
 	}
 
@@ -429,22 +428,22 @@ func WriteKubeconfigFromRESTConfig(restConfig *rest.Config) ([]byte, error) {
 	}
 
 	if _, ok := availableAuthTypes[authTypeBearerToken]; ok {
-		authInfo = &clientapi.AuthInfo{
+		authInfo = &clientcmdapi.AuthInfo{
 			Token: restConfig.BearerToken,
 		}
 	}
 
 	if _, ok := availableAuthTypes[authTypeBasicAuth]; ok {
-		authInfo = &clientapi.AuthInfo{
+		authInfo = &clientcmdapi.AuthInfo{
 			Username: restConfig.Username,
 			Password: restConfig.Password,
 		}
 	}
 
 	if _, ok := availableAuthTypes[authTypeClientCert]; ok {
-		authInfo = &clientapi.AuthInfo{
-			ClientCertificateData: restConfig.TLSClientConfig.CertData,
-			ClientKeyData:         restConfig.TLSClientConfig.KeyData,
+		authInfo = &clientcmdapi.AuthInfo{
+			ClientCertificateData: restConfig.CertData,
+			ClientKeyData:         restConfig.KeyData,
 		}
 	}
 
@@ -453,21 +452,21 @@ func WriteKubeconfigFromRESTConfig(restConfig *rest.Config) ([]byte, error) {
 		server = fmt.Sprint(server, "/", restConfig.APIPath)
 	}
 
-	kubeConfig := clientapi.Config{
+	kubeConfig := clientcmdapi.Config{
 		CurrentContext: id,
-		Contexts: map[string]*clientapi.Context{
+		Contexts: map[string]*clientcmdapi.Context{
 			id: {
 				AuthInfo: id,
 				Cluster:  id,
 			},
 		},
-		Clusters: map[string]*clientapi.Cluster{
+		Clusters: map[string]*clientcmdapi.Cluster{
 			id: {
 				Server:                   server,
 				CertificateAuthorityData: restConfig.CAData,
 			},
 		},
-		AuthInfos: map[string]*clientapi.AuthInfo{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			id: authInfo,
 		},
 	}
