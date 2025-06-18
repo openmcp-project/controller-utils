@@ -1,9 +1,14 @@
 package clusteraccess_test
 
 import (
+	"fmt"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"os"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -386,6 +391,74 @@ var _ = Describe("ClusterAccess", func() {
 			Expect(crb.Subjects).To(BeEquivalentTo(expectedSubjects()))
 		})
 
+	})
+
+	Context("Marshal RESTConfig", func() {
+		readRESTConfigFromKubeconfig := func(kubeconfig string) *rest.Config {
+			data, err := os.ReadFile(fmt.Sprint("./testdata/kubeconfig/", kubeconfig))
+			Expect(err).ToNot(HaveOccurred(), "failed to read kubeconfig file")
+
+			config, err := clientcmd.RESTConfigFromKubeConfig(data)
+			Expect(err).ToNot(HaveOccurred(), "failed to parse kubeconfig file")
+			return config
+		}
+
+		It("should create an OIDC config", func() {
+			restConfig := readRESTConfigFromKubeconfig("kubeconfig-token.yaml")
+
+			oidcConfigRaw, err := clusteraccess.WriteOIDCConfigFromRESTConfig(restConfig)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(oidcConfigRaw).ToNot(BeEmpty())
+
+			var oidcConfig map[string]string
+			Expect(yaml.Unmarshal(oidcConfigRaw, &oidcConfig)).ToNot(HaveOccurred())
+			Expect(oidcConfig).To(HaveKeyWithValue("host", "https://test-server"))
+			Expect(oidcConfig)
+		})
+
+		It("should create a kubeconfig with token", func() {
+			restConfig := readRESTConfigFromKubeconfig("kubeconfig-token.yaml")
+
+			kubeconfigRaw, err := clusteraccess.WriteKubeconfigFromRESTConfig(restConfig)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(kubeconfigRaw).ToNot(BeEmpty())
+
+			config, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigRaw)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(config.Host).To(Equal("https://test-server"))
+			Expect(config.TLSClientConfig.CAData).ToNot(BeEmpty())
+			Expect(config.BearerToken).To(Equal("dGVzdC10b2tlbg=="))
+		})
+
+		It("should create a kubeconfig with basic auth", func() {
+			restConfig := readRESTConfigFromKubeconfig("kubeconfig-basicauth.yaml")
+
+			kubeconfigRaw, err := clusteraccess.WriteKubeconfigFromRESTConfig(restConfig)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(kubeconfigRaw).ToNot(BeEmpty())
+
+			config, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigRaw)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(config.Host).To(Equal("https://test-server"))
+			Expect(config.TLSClientConfig.CAData).ToNot(BeEmpty())
+			Expect(config.Username).To(Equal("foo"))
+			Expect(config.Password).To(Equal("bar"))
+		})
+
+		It("should create a kubeconfig with client tls", func() {
+			restConfig := readRESTConfigFromKubeconfig("kubeconfig-tls.yaml")
+
+			kubeconfigRaw, err := clusteraccess.WriteKubeconfigFromRESTConfig(restConfig)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(kubeconfigRaw).ToNot(BeEmpty())
+
+			config, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigRaw)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(config.Host).To(Equal("https://test-server"))
+			Expect(config.TLSClientConfig.CAData).ToNot(BeEmpty())
+			Expect(config.TLSClientConfig.CertData).ToNot(BeEmpty())
+			Expect(config.TLSClientConfig.KeyData).ToNot(BeEmpty())
+		})
 	})
 
 })
