@@ -3,8 +3,9 @@ package clusteraccess
 import (
 	"context"
 	"fmt"
-	"sigs.k8s.io/yaml"
 	"time"
+
+	"sigs.k8s.io/yaml"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
