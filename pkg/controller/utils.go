@@ -53,20 +53,22 @@ func ObjectKey(name string, maybeNamespace ...string) client.ObjectKey {
 	}
 }
 
-// RemoveFinalizerWithPrefix removes the first finalizer with the given prefix from the object.
+// RemoveFinalizersWithPrefix removes finalizers with a given prefix from the object and returns their suffixes.
+// If the third argument is true, all finalizers with the given prefix are removed, otherwise only the first one.
 // The bool return value indicates whether a finalizer was removed.
-// If it is true, the string return value holds the suffix of the removed finalizer.
+// If it is true, the slice return value holds the suffixes of all removed finalizers (will be of length 1 if removeAll is false).
+// If it is false, no finalizer with the given prefix was found. The slice return value will be empty in this case.
 // The logic is based on the controller-runtime's RemoveFinalizer function.
-func RemoveFinalizerWithPrefix(obj client.Object, prefix string) (string, bool) {
+func RemoveFinalizersWithPrefix(obj client.Object, prefix string, removeAll bool) ([]string, bool) {
 	fins := obj.GetFinalizers()
 	length := len(fins)
-	suffix := ""
+	suffixes := make([]string, 0, length)
 	found := false
 
 	index := 0
 	for i := range length {
-		if !found && strings.HasPrefix(fins[i], prefix) {
-			suffix = strings.TrimPrefix(fins[i], prefix)
+		if (removeAll || !found) && strings.HasPrefix(fins[i], prefix) {
+			suffixes = append(suffixes, strings.TrimPrefix(fins[i], prefix))
 			found = true
 			continue
 		}
@@ -74,5 +76,5 @@ func RemoveFinalizerWithPrefix(obj client.Object, prefix string) (string, bool) 
 		index++
 	}
 	obj.SetFinalizers(fins[:index])
-	return suffix, length != index
+	return suffixes, length != index
 }

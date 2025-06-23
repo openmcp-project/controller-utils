@@ -59,21 +59,30 @@ var _ = Describe("Predicates", func() {
 
 	})
 
-	Context("RemoveFinalizerWithPrefix", func() {
+	Context("RemoveFinalizersWithPrefix", func() {
 
 		It("should only remove the first finalizer with the given prefix", func() {
 			ns := &corev1.Namespace{}
 			ns.SetFinalizers([]string{"foo/bar", "baz/qux", "foo/baz"})
-			suffix, removed := RemoveFinalizerWithPrefix(ns, "foo/")
+			suffix, removed := RemoveFinalizersWithPrefix(ns, "foo/", false)
 			Expect(removed).To(BeTrue())
-			Expect(suffix).To(Equal("bar"))
+			Expect(suffix).To(ConsistOf("bar"))
 			Expect(ns.GetFinalizers()).To(Equal([]string{"baz/qux", "foo/baz"}), "should remove only the first matching finalizer")
+		})
+
+		It("should remove all finalizers with the given prefix", func() {
+			ns := &corev1.Namespace{}
+			ns.SetFinalizers([]string{"foo/bar", "baz/qux", "foo/baz"})
+			suffix, removed := RemoveFinalizersWithPrefix(ns, "foo/", true)
+			Expect(removed).To(BeTrue())
+			Expect(suffix).To(ConsistOf("bar", "baz"))
+			Expect(ns.GetFinalizers()).To(Equal([]string{"baz/qux"}), "should remove all matching finalizers")
 		})
 
 		It("should return false if no finalizer with the given prefix exists", func() {
 			ns := &corev1.Namespace{}
 			ns.SetFinalizers([]string{"foo/bar", "baz/qux"})
-			suffix, removed := RemoveFinalizerWithPrefix(ns, "nonexistent/")
+			suffix, removed := RemoveFinalizersWithPrefix(ns, "nonexistent/", false)
 			Expect(removed).To(BeFalse())
 			Expect(suffix).To(BeEmpty())
 			Expect(ns.GetFinalizers()).To(Equal([]string{"foo/bar", "baz/qux"}), "should not modify finalizers if no match is found")
