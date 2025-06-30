@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cluster"
 
 	"github.com/openmcp-project/controller-utils/pkg/controller"
+	"github.com/openmcp-project/controller-utils/pkg/retry"
 )
 
 type Cluster struct {
@@ -236,6 +237,12 @@ func (c *Cluster) APIServerEndpoint() string {
 		return ""
 	}
 	return c.restCfg.Host
+}
+
+// Retry returns a retrying client for the cluster.
+// Returns nil if the client has not been initialized.
+func (c *Cluster) Retry() *retry.Client {
+	return retry.NewRetryingClient(c.Client())
 }
 
 /////////////////

@@ -14,7 +14,7 @@ import (
 func TestConditions(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "ClusterAccess Test Suite")
+	RunSpecs(t, "Pairs Test Suite")
 }
 
 type comparableIntAlias int

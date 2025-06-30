@@ -153,6 +153,16 @@ func (eb *EnvironmentBuilder) WithAfterClientCreationCallback(callback func(clie
 	return eb
 }
 
+// WithUIDs enables UID injection.
+// All objects that are initially loaded or afterwards created via the client's 'Create' method will have a random UID injected, if they do not already have one.
+// Note that this function registers an interceptor function, which will be overwritten if 'WithFakeClientBuilderCall("WithInterceptorFuncs", ...)' is also called.
+// This would lead to newly created objects not having a UID injected.
+// To avoid this, pass 'InjectUIDOnObjectCreation(...)' into the interceptor.Funcs' Create field. The argument allows to inject your own additional Create logic, if desired.
+func (eb *EnvironmentBuilder) WithUIDs() *EnvironmentBuilder {
+	eb.ComplexEnvironmentBuilder.WithUIDs(SimpleEnvironmentDefaultKey)
+	return eb
+}
+
 // WithFakeClientBuilderCall allows to inject method calls to fake.ClientBuilder when the fake client is created during Build().
 // The fake client is usually created using WithScheme(...).WithObjects(...).WithStatusSubresource(...).Build().
 // This function allows to inject additional method calls. It is only required for advanced use-cases.
