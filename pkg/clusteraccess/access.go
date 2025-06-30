@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"sigs.k8s.io/yaml"
+
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -340,4 +342,139 @@ func ComputeTokenRenewalTimeWithRatio(creationTime, expirationTime time.Time, ra
 	// renewalAt is the point in time at which the token should be renewed
 	renewalAt := creationTime.Add(renewalAfter)
 	return renewalAt
+}
+
+// oidcTrustConfig represents the configuration for an OIDC trust relationship.
+// It includes the host of the Kubernetes API server, CA data for TLS verification,
+// and the audience for the OIDC tokens.
+type oidcTrustConfig struct {
+	// Host is the URL of the Kubernetes API server.
+	Host string `json:"host,omitempty"`
+	// CAData is the base64-encoded CA certificate data used to verify the server's TLS certificate.
+	CAData []byte `json:"caData,omitempty"`
+}
+
+// WriteOIDCConfigFromRESTConfig converts a RESTConfig to an OIDC trust configuration format.
+// When creating a Kubernetes deployment, this configuration is used to set up the trust relationship to
+// the target cluster.
+// Example:
+//
+// spec:
+//
+//	template:
+//	  spec:
+//	    volumes:
+//	    - name: oidc-trust-config
+//	      projected:
+//	        sources:
+//	        - secret:
+//	          name: oidc-trust-config
+//	          items:
+//	          - key: host
+//	            path: cluster/host
+//	          - key: caData
+//	            path: cluster/ca.crt
+//	        - serviceAccountToken:
+//	            audience: target-cluster
+//	            path: cluster/token
+//	            expirationSeconds: 3600
+//
+//	    volumeMounts:
+//	    - name: oidc-trust-config
+//	      mountPath: /var/run/secrets/oidc-trust-config
+//	      readOnly: true
+func WriteOIDCConfigFromRESTConfig(restConfig *rest.Config) ([]byte, error) {
+	oidcConfig := &oidcTrustConfig{
+		Host:   restConfig.Host,
+		CAData: restConfig.CAData,
+	}
+
+	configMarshaled, err := yaml.Marshal(oidcConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write OIDC trust config: %w", err)
+	}
+
+	return configMarshaled, nil
+}
+
+// WriteKubeconfigFromRESTConfig converts the RESTConfig to a kubeconfig format.
+// Supported authentication methods are Bearer Token, Username/Password and Client Certificate.
+func WriteKubeconfigFromRESTConfig(restConfig *rest.Config) ([]byte, error) {
+	var authInfo *clientcmdapi.AuthInfo
+
+	id := "cluster"
+
+	type authType string
+	const (
+		authTypeBearerToken authType = "BearerToken"
+		authTypeBasicAuth   authType = "BasicAuth"
+		authTypeClientCert  authType = "ClientCert"
+	)
+	availableAuthTypes := make(map[authType]interface{})
+	if restConfig.BearerToken != "" {
+		availableAuthTypes[authTypeBearerToken] = nil
+	}
+
+	if restConfig.Username != "" && restConfig.Password != "" {
+		availableAuthTypes[authTypeBasicAuth] = nil
+	}
+
+	if restConfig.CertData != nil && restConfig.KeyData != nil {
+		availableAuthTypes[authTypeClientCert] = nil
+	}
+
+	if len(availableAuthTypes) == 0 {
+		return nil, fmt.Errorf("cannot write to kubeconfig when RESTConfig does not contain any supported authentication information")
+	}
+
+	if _, ok := availableAuthTypes[authTypeBearerToken]; ok {
+		authInfo = &clientcmdapi.AuthInfo{
+			Token: restConfig.BearerToken,
+		}
+	}
+
+	if _, ok := availableAuthTypes[authTypeBasicAuth]; ok {
+		authInfo = &clientcmdapi.AuthInfo{
+			Username: restConfig.Username,
+			Password: restConfig.Password,
+		}
+	}
+
+	if _, ok := availableAuthTypes[authTypeClientCert]; ok {
+		authInfo = &clientcmdapi.AuthInfo{
+			ClientCertificateData: restConfig.CertData,
+			ClientKeyData:         restConfig.KeyData,
+		}
+	}
+
+	server := restConfig.Host
+	if restConfig.APIPath != "" {
+		server = fmt.Sprint(server, "/", restConfig.APIPath)
+	}
+
+	kubeConfig := clientcmdapi.Config{
+		CurrentContext: id,
+		Contexts: map[string]*clientcmdapi.Context{
+			id: {
+				AuthInfo: id,
+				Cluster:  id,
+			},
+		},
+		Clusters: map[string]*clientcmdapi.Cluster{
+			id: {
+				Server:                   server,
+				CertificateAuthorityData: restConfig.CAData,
+			},
+		},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			id: authInfo,
+		},
+	}
+
+	configMarshaled, err := clientcmd.Write(kubeConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to write RESTConfig to kubeconfig: %w", err)
+	}
+
+	return configMarshaled, nil
 }
