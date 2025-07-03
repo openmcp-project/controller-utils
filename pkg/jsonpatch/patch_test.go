@@ -40,6 +40,14 @@ var _ = Describe("JSONPatch", func() {
 			Expect(doc).To(Equal([]byte(docBase)))
 		})
 
+		It("should add an element to a list", func() {
+			patch := jsonpatch.New(jpapi.NewJSONPatches(jpapi.NewJSONPatch(jpapi.ADD, "/abc/-1", jpapi.NewAny(map[string]any{"d": 4}), nil)))
+			result, err := patch.Apply(doc)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal([]byte(`{"foo":"bar","baz":{"foobar":"asdf"},"abc":[{"a":1},{"b":2},{"c":3},{"d":4}]}`)))
+			Expect(doc).To(Equal([]byte(docBase)))
+		})
+
 		It("should apply multiple patches in the correct order", func() {
 			patch := jsonpatch.New(jpapi.NewJSONPatches(
 				jpapi.NewJSONPatch(jpapi.ADD, "/foo", jpapi.NewAny("baz"), nil),
