@@ -3,9 +3,13 @@ package jsonpatch
 import "encoding/json"
 
 // JSONPatch represents a JSON patch operation.
-// Technically, a single JSON patch is already a list of patch operations. This type represents a single operation, use JSONPatches for a list of operations instead.
+// Technically, a single JSON patch (as defined by RFC 6902) is a list of patch operations.
+// Opposed to that, this type represents a single operation. Use the JSONPatches type for a list of operations instead.
+// +kubebuilder:validation:Schemaless
+// +kubebuilder:validation:Type=object
 type JSONPatch struct {
 	// Operation is the operation to perform.
+	// Valid values are: add, remove, replace, move, copy, test
 	// +kubebuilder:validation:Enum=add;remove;replace;move;copy;test
 	// +kubebuilder:validation:Required
 	Operation Operation `json:"op"`
@@ -16,6 +20,8 @@ type JSONPatch struct {
 
 	// Value is the value to set at the target location.
 	// Required for add, replace, and test operations.
+	// +kubebuilder:validation:Schemaless
+	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
 	Value *Any `json:"value,omitempty"`
 
