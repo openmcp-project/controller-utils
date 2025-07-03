@@ -12,13 +12,13 @@ import (
 
 type Untyped = []byte
 
-type JSONPatch = TypedJSONPatch[Untyped]
+type Patch = TypedPatch[Untyped]
 
-type TypedJSONPatch[T any] struct {
+type TypedPatch[T any] struct {
 	jpapi.JSONPatches
 }
 
-type JSONPatchOptions struct {
+type Options struct {
 	*jplib.ApplyOptions
 
 	// Indent is the string used for indentation in the output JSON.
@@ -26,21 +26,21 @@ type JSONPatchOptions struct {
 	Indent string
 }
 
-type JSONPatchOption func(*JSONPatchOptions)
+type Option func(*Options)
 
 // New creates a new JSONPatch with the given patches.
 // This JSONPatch's Apply method works on plain JSON bytes.
 // To apply the patches to an arbitrary type (which is marshalled to JSON before and unmarshalled back afterwards),
 // use NewTyped instead.
-func New(patches jpapi.JSONPatches) *JSONPatch {
-	return &TypedJSONPatch[Untyped]{
+func New(patches jpapi.JSONPatches) *Patch {
+	return &TypedPatch[Untyped]{
 		JSONPatches: patches,
 	}
 }
 
 // NewTyped creates a new TypedJSONPatch with the given patches.
-func NewTyped[T any](patches jpapi.JSONPatches) *TypedJSONPatch[T] {
-	return &TypedJSONPatch[T]{
+func NewTyped[T any](patches jpapi.JSONPatches) *TypedPatch[T] {
+	return &TypedPatch[T]{
 		JSONPatches: patches,
 	}
 }
@@ -49,7 +49,7 @@ func NewTyped[T any](patches jpapi.JSONPatches) *TypedJSONPatch[T] {
 // If the generic type is Untyped (which is an alias for []byte),
 // it will treat the document as raw JSON bytes.
 // Otherwise, doc is marshalled to JSON before applying the patch and then again unmarshalled back to the original type afterwards.
-func (p *TypedJSONPatch[T]) Apply(doc T, options ...JSONPatchOption) (T, error) {
+func (p *TypedPatch[T]) Apply(doc T, options ...Option) (T, error) {
 	var result T
 	var rawDoc []byte
 	isUntyped := reflect.TypeFor[T]() == reflect.TypeFor[Untyped]()
@@ -63,7 +63,7 @@ func (p *TypedJSONPatch[T]) Apply(doc T, options ...JSONPatchOption) (T, error) 
 		rawDoc = tmp
 	}
 
-	opts := &JSONPatchOptions{
+	opts := &Options{
 		ApplyOptions: jplib.NewApplyOptions(),
 	}
 	for _, opt := range options {
@@ -100,57 +100,57 @@ func (p *TypedJSONPatch[T]) Apply(doc T, options ...JSONPatchOption) (T, error) 
 // SupportNegativeIndices decides whether to support non-standard practice of
 // allowing negative indices to mean indices starting at the end of an array.
 // Default to true.
-func SupportNegativeIndices(val bool) JSONPatchOption {
-	return func(opts *JSONPatchOptions) {
+func SupportNegativeIndices(val bool) Option {
+	return func(opts *Options) {
 		opts.SupportNegativeIndices = val
 	}
 }
 
 // AccumulatedCopySizeLimit limits the total size increase in bytes caused by
 // "copy" operations in a patch.
-func AccumulatedCopySizeLimit(val int64) JSONPatchOption {
-	return func(opts *JSONPatchOptions) {
+func AccumulatedCopySizeLimit(val int64) Option {
+	return func(opts *Options) {
 		opts.AccumulatedCopySizeLimit = val
 	}
 }
 
 // AllowMissingPathOnRemove indicates whether to fail "remove" operations when the target path is missing.
 // Default to false.
-func AllowMissingPathOnRemove(val bool) JSONPatchOption {
-	return func(opts *JSONPatchOptions) {
+func AllowMissingPathOnRemove(val bool) Option {
+	return func(opts *Options) {
 		opts.AllowMissingPathOnRemove = val
 	}
 }
 
 // EnsurePathExistsOnAdd instructs json-patch to recursively create the missing parts of path on "add" operation.
 // Defaults to false.
-func EnsurePathExistsOnAdd(val bool) JSONPatchOption {
-	return func(opts *JSONPatchOptions) {
+func EnsurePathExistsOnAdd(val bool) Option {
+	return func(opts *Options) {
 		opts.EnsurePathExistsOnAdd = val
 	}
 }
 
 // EscapeHTML sets the EscapeHTML flag for json marshalling.
 // Defaults to true.
-func EscapeHTML(val bool) JSONPatchOption {
-	return func(opts *JSONPatchOptions) {
+func EscapeHTML(val bool) Option {
+	return func(opts *Options) {
 		opts.EscapeHTML = val
 	}
 }
 
 // Indent sets the indentation string for the output JSON.
 // If empty, no indentation is applied.
-func Indent(val string) JSONPatchOption {
-	return func(opts *JSONPatchOptions) {
+func Indent(val string) Option {
+	return func(opts *Options) {
 		opts.Indent = val
 	}
 }
 
-var _ json.Marshaler = &TypedJSONPatch[Untyped]{}
+var _ json.Marshaler = &TypedPatch[Untyped]{}
 
 // MarshalJSON marshals the TypedJSONPatch to JSON.
 // Note that this uses the ConvertPath function to ensure that the paths are in the correct format.
-func (p *TypedJSONPatch[T]) MarshalJSON() ([]byte, error) {
+func (p *TypedPatch[T]) MarshalJSON() ([]byte, error) {
 	if p == nil {
 		return []byte("null"), nil
 	}
