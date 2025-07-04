@@ -1,6 +1,11 @@
+// +kubebuilder:object:generate=true
 package jsonpatch
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+)
 
 // JSONPatch represents a JSON patch operation.
 // Technically, a single JSON patch (as defined by RFC 6902) is a list of patch operations.
@@ -23,7 +28,7 @@ type JSONPatch struct {
 	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
-	Value *Any `json:"value,omitempty"`
+	Value *apiextensionsv1.JSON `json:"value,omitempty"`
 
 	// From is the source location for move and copy operations.
 	// +optional
@@ -52,13 +57,31 @@ const (
 )
 
 // NewJSONPatch creates a new JSONPatch with the given values.
-func NewJSONPatch(op Operation, path string, value *Any, from *string) JSONPatch {
-	return JSONPatch{
+// If value is non-nil, it is marshaled to JSON. Returns an error if the value cannot be marshaled.
+func NewJSONPatch(op Operation, path string, value any, from *string) (JSONPatch, error) {
+	res := JSONPatch{
 		Operation: op,
 		Path:      path,
-		Value:     value,
 		From:      from,
 	}
+	var err error
+	if value != nil {
+		var valueJSON []byte
+		valueJSON, err = json.Marshal(value)
+		res.Value = &apiextensionsv1.JSON{
+			Raw: valueJSON,
+		}
+	}
+	return res, err
+}
+
+// NewJSONPatchOrPanic works like NewJSONPatch, but instead of returning an error, it panics if the patch cannot be created.
+func NewJSONPatchOrPanic(op Operation, path string, value any, from *string) JSONPatch {
+	patch, err := NewJSONPatch(op, path, value, from)
+	if err != nil {
+		panic(err)
+	}
+	return patch
 }
 
 // NewJSONPatches combines multiple JSONPatch instances into a single JSONPatches instance.
@@ -69,114 +92,4 @@ func NewJSONPatches(patches ...JSONPatch) JSONPatches {
 		result = append(result, patch)
 	}
 	return result
-}
-
-func NewAny(value any) *Any {
-	return &Any{Value: value}
-}
-
-type Any struct {
-	Value any `json:"-"`
-}
-
-var _ json.Marshaler = &Any{}
-var _ json.Unmarshaler = &Any{}
-
-func (a *Any) MarshalJSON() ([]byte, error) {
-	if a == nil {
-		return []byte("null"), nil
-	}
-	return json.Marshal(a.Value)
-}
-
-func (a *Any) UnmarshalJSON(data []byte) error {
-	if data == nil || string(data) == "null" {
-		a.Value = nil
-		return nil
-	}
-	return json.Unmarshal(data, &a.Value)
-}
-
-func (in *JSONPatch) DeepCopy() *JSONPatch {
-	if in == nil {
-		return nil
-	}
-	out := &JSONPatch{}
-	in.DeepCopyInto(out)
-	return out
-}
-
-func (in *JSONPatch) DeepCopyInto(out *JSONPatch) {
-	if out == nil {
-		return
-	}
-	out.Operation = in.Operation
-	out.Path = in.Path
-	if in.Value != nil {
-		valueCopy := *in.Value
-		out.Value = &valueCopy
-	} else {
-		out.Value = nil
-	}
-	if in.From != nil {
-		fromCopy := *in.From
-		out.From = &fromCopy
-	} else {
-		out.From = nil
-	}
-}
-
-func (in *JSONPatches) DeepCopy() *JSONPatches {
-	if in == nil {
-		return nil
-	}
-	out := &JSONPatches{}
-	for _, item := range *in {
-		outItem := item.DeepCopy()
-		*out = append(*out, *outItem)
-	}
-	return out
-}
-
-func (in *JSONPatches) DeepCopyInto(out *JSONPatches) {
-	if out == nil {
-		return
-	}
-	*out = make(JSONPatches, len(*in))
-	for i, item := range *in {
-		outItem := item.DeepCopy()
-		(*out)[i] = *outItem
-	}
-}
-
-func (in *Any) DeepCopy() *Any {
-	if in == nil {
-		return nil
-	}
-	out := &Any{}
-	in.DeepCopyInto(out)
-	return out
-}
-
-func (in *Any) DeepCopyInto(out *Any) {
-	if out == nil {
-		return
-	}
-	if in.Value == nil {
-		out.Value = nil
-		return
-	}
-	// Use json.Marshal and json.Unmarshal to deep copy the value.
-	data, err := json.Marshal(in.Value)
-	if err != nil {
-		panic("failed to marshal Any value: " + err.Error())
-	}
-	if err := json.Unmarshal(data, &out.Value); err != nil {
-		panic("failed to unmarshal Any value: " + err.Error())
-	}
-}
-
-// Ptr is a convenience function to create a pointer to the given value.
-func Ptr[T any](val T) *T {
-	return &val
 }

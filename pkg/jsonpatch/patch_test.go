@@ -5,6 +5,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/utils/ptr"
 
 	jpapi "github.com/openmcp-project/controller-utils/api/jsonpatch"
 	"github.com/openmcp-project/controller-utils/pkg/jsonpatch"
@@ -33,7 +34,7 @@ var _ = Describe("JSONPatch", func() {
 		})
 
 		It("should apply a simple patch", func() {
-			patch := jsonpatch.New(jpapi.NewJSONPatches(jpapi.NewJSONPatch(jpapi.ADD, "/foo", jpapi.NewAny("baz"), nil)))
+			patch := jsonpatch.New(jpapi.NewJSONPatches(jpapi.NewJSONPatchOrPanic(jpapi.ADD, "/foo", "baz", nil)))
 			result, err := patch.Apply(doc)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result).To(Equal([]byte(`{"foo":"baz","baz":{"foobar":"asdf"},"abc":[{"a":1},{"b":2},{"c":3}]}`)))
@@ -41,7 +42,7 @@ var _ = Describe("JSONPatch", func() {
 		})
 
 		It("should add an element to a list", func() {
-			patch := jsonpatch.New(jpapi.NewJSONPatches(jpapi.NewJSONPatch(jpapi.ADD, "/abc/-1", jpapi.NewAny(map[string]any{"d": 4}), nil)))
+			patch := jsonpatch.New(jpapi.NewJSONPatches(jpapi.NewJSONPatchOrPanic(jpapi.ADD, "/abc/-1", map[string]any{"d": 4}, nil)))
 			result, err := patch.Apply(doc)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result).To(Equal([]byte(`{"foo":"bar","baz":{"foobar":"asdf"},"abc":[{"a":1},{"b":2},{"c":3},{"d":4}]}`)))
@@ -50,10 +51,10 @@ var _ = Describe("JSONPatch", func() {
 
 		It("should apply multiple patches in the correct order", func() {
 			patch := jsonpatch.New(jpapi.NewJSONPatches(
-				jpapi.NewJSONPatch(jpapi.ADD, "/foo", jpapi.NewAny("baz"), nil),
-				jpapi.NewJSONPatch(jpapi.COPY, "/baz/foobar", nil, jpapi.Ptr("/foo")),
-				jpapi.NewJSONPatch(jpapi.REPLACE, "/abc/2/c", jpapi.NewAny(6), nil),
-				jpapi.NewJSONPatch(jpapi.REMOVE, "/abc/1", nil, nil),
+				jpapi.NewJSONPatchOrPanic(jpapi.ADD, "/foo", "baz", nil),
+				jpapi.NewJSONPatchOrPanic(jpapi.COPY, "/baz/foobar", nil, ptr.To("/foo")),
+				jpapi.NewJSONPatchOrPanic(jpapi.REPLACE, "/abc/2/c", 6, nil),
+				jpapi.NewJSONPatchOrPanic(jpapi.REMOVE, "/abc/1", nil, nil),
 			))
 			result, err := patch.Apply(doc)
 			Expect(err).ToNot(HaveOccurred())
@@ -63,10 +64,10 @@ var _ = Describe("JSONPatch", func() {
 
 		It("should handle paths that need conversion correctly", func() {
 			patch := jsonpatch.New(jpapi.NewJSONPatches(
-				jpapi.NewJSONPatch(jpapi.ADD, ".foo", jpapi.NewAny("baz"), nil),
-				jpapi.NewJSONPatch(jpapi.COPY, "baz.foobar", nil, jpapi.Ptr(".foo")),
-				jpapi.NewJSONPatch(jpapi.REPLACE, "abc[2].c", jpapi.NewAny(6), nil),
-				jpapi.NewJSONPatch(jpapi.REMOVE, ".abc[1]", nil, nil),
+				jpapi.NewJSONPatchOrPanic(jpapi.ADD, ".foo", "baz", nil),
+				jpapi.NewJSONPatchOrPanic(jpapi.COPY, "baz.foobar", nil, ptr.To(".foo")),
+				jpapi.NewJSONPatchOrPanic(jpapi.REPLACE, "abc[2].c", 6, nil),
+				jpapi.NewJSONPatchOrPanic(jpapi.REMOVE, ".abc[1]", nil, nil),
 			))
 			result, err := patch.Apply(doc)
 			Expect(err).ToNot(HaveOccurred())
@@ -98,7 +99,7 @@ var _ = Describe("JSONPatch", func() {
 			Expect(doc).To(Equal([]byte(docBase)))
 
 			patch = jsonpatch.New(jpapi.NewJSONPatches(
-				jpapi.NewJSONPatch(jpapi.REPLACE, "/abc/-1", jpapi.NewAny(map[string]any{"d": 4}), nil),
+				jpapi.NewJSONPatchOrPanic(jpapi.REPLACE, "/abc/-1", map[string]any{"d": 4}, nil),
 			))
 			result, err = patch.Apply(doc)
 			Expect(err).ToNot(HaveOccurred())
@@ -152,7 +153,7 @@ var _ = Describe("JSONPatch", func() {
 		})
 
 		It("should apply a simple patch", func() {
-			patch := jsonpatch.NewTyped[*testDoc](jpapi.NewJSONPatches(jpapi.NewJSONPatch(jpapi.ADD, "/foo", jpapi.NewAny("baz"), nil)))
+			patch := jsonpatch.NewTyped[*testDoc](jpapi.NewJSONPatches(jpapi.NewJSONPatchOrPanic(jpapi.ADD, "/foo", "baz", nil)))
 			result, err := patch.Apply(typedDoc)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result).ToNot(BeNil())
@@ -167,10 +168,10 @@ var _ = Describe("JSONPatch", func() {
 
 		It("should apply multiple patches in the correct order", func() {
 			patch := jsonpatch.NewTyped[*testDoc](jpapi.NewJSONPatches(
-				jpapi.NewJSONPatch(jpapi.ADD, "/foo", jpapi.NewAny("baz"), nil),
-				jpapi.NewJSONPatch(jpapi.COPY, "/baz/foobar", nil, jpapi.Ptr("/foo")),
-				jpapi.NewJSONPatch(jpapi.REPLACE, "/abc/2/c", jpapi.NewAny(6), nil),
-				jpapi.NewJSONPatch(jpapi.REMOVE, "/abc/1", nil, nil),
+				jpapi.NewJSONPatchOrPanic(jpapi.ADD, "/foo", "baz", nil),
+				jpapi.NewJSONPatchOrPanic(jpapi.COPY, "/baz/foobar", nil, ptr.To("/foo")),
+				jpapi.NewJSONPatchOrPanic(jpapi.REPLACE, "/abc/2/c", 6, nil),
+				jpapi.NewJSONPatchOrPanic(jpapi.REMOVE, "/abc/1", nil, nil),
 			))
 			result, err := patch.Apply(typedDoc)
 			Expect(err).ToNot(HaveOccurred())
@@ -186,10 +187,10 @@ var _ = Describe("JSONPatch", func() {
 
 		It("should handle paths that need conversion correctly", func() {
 			patch := jsonpatch.NewTyped[*testDoc](jpapi.NewJSONPatches(
-				jpapi.NewJSONPatch(jpapi.ADD, ".foo", jpapi.NewAny("baz"), nil),
-				jpapi.NewJSONPatch(jpapi.COPY, "baz.foobar", nil, jpapi.Ptr(".foo")),
-				jpapi.NewJSONPatch(jpapi.REPLACE, "abc[2].c", jpapi.NewAny(6), nil),
-				jpapi.NewJSONPatch(jpapi.REMOVE, ".abc[1]", nil, nil),
+				jpapi.NewJSONPatchOrPanic(jpapi.ADD, ".foo", "baz", nil),
+				jpapi.NewJSONPatchOrPanic(jpapi.COPY, "baz.foobar", nil, ptr.To(".foo")),
+				jpapi.NewJSONPatchOrPanic(jpapi.REPLACE, "abc[2].c", 6, nil),
+				jpapi.NewJSONPatchOrPanic(jpapi.REMOVE, ".abc[1]", nil, nil),
 			))
 			result, err := patch.Apply(typedDoc)
 			Expect(err).ToNot(HaveOccurred())
@@ -212,7 +213,7 @@ var _ = Describe("JSONPatch", func() {
 			var apiPatches jpapi.JSONPatches
 			err := json.Unmarshal(rawAPIPatches, &apiPatches)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(apiPatches).To(ConsistOf(jpapi.NewJSONPatch(jpapi.ADD, "/foo", jpapi.NewAny(map[string]any{"foobar": "foobaz"}), jpapi.Ptr("/bar"))))
+			Expect(apiPatches).To(ConsistOf(jpapi.NewJSONPatchOrPanic(jpapi.ADD, "/foo", map[string]any{"foobar": "foobaz"}, ptr.To("/bar"))))
 			marshalled, err := json.Marshal(apiPatches)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(marshalled).To(Equal(rawAPIPatches))
