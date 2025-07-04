@@ -7,8 +7,12 @@ import (
 
 	jplib "github.com/evanphx/json-patch/v5"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
 	jpapi "github.com/openmcp-project/controller-utils/api/jsonpatch"
 )
+
+type PatchValueData = apiextensionsv1.JSON
 
 type Untyped = []byte
 
@@ -32,14 +36,14 @@ type Option func(*Options)
 // This JSONPatch's Apply method works on plain JSON bytes.
 // To apply the patches to an arbitrary type (which is marshalled to JSON before and unmarshalled back afterwards),
 // use NewTyped instead.
-func New(patches jpapi.JSONPatches) *Patch {
+func New(patches ...jpapi.JSONPatch) *Patch {
 	return &TypedPatch[Untyped]{
 		JSONPatches: patches,
 	}
 }
 
 // NewTyped creates a new TypedJSONPatch with the given patches.
-func NewTyped[T any](patches jpapi.JSONPatches) *TypedPatch[T] {
+func NewTyped[T any](patches ...jpapi.JSONPatch) *TypedPatch[T] {
 	return &TypedPatch[T]{
 		JSONPatches: patches,
 	}
@@ -165,13 +169,11 @@ func (p *TypedPatch[T]) MarshalJSON() ([]byte, error) {
 		}
 		p.Path = convertedPath
 
-		if p.From != nil {
-			convertedFrom, iperr := ConvertPath(*p.From)
-			if iperr != nil {
-				return nil, fmt.Errorf("failed to convert 'from' path at index %d: %w", i, iperr)
-			}
-			p.From = &convertedFrom
+		convertedFrom, iperr := ConvertPath(p.From)
+		if iperr != nil {
+			return nil, fmt.Errorf("failed to convert 'from' path at index %d: %w", i, iperr)
 		}
+		p.From = convertedFrom
 
 		patches[i] = *p
 	}
