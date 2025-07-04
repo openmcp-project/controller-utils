@@ -29,6 +29,10 @@ func ConvertPath(path string) (string, *InvalidPathError) {
 		return path, nil
 	}
 
+	// escape JSONPath special characters
+	path = strings.ReplaceAll(path, "~", "~0") // escape tilde (~) to ~0
+	path = strings.ReplaceAll(path, "/", "~1") // escape slash (/) to ~1
+
 	segments := []string{}
 	index := 0
 	for index < len(path) {

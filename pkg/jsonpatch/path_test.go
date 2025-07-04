@@ -37,6 +37,10 @@ var _ = Describe("ConvertPath", func() {
 		verifyPathConversion("a.\\'b\\'.c", "/a/'b'/c")
 	})
 
+	It("should handle paths with ~ and / characters correctly", func() {
+		verifyPathConversion(".a~b.c/d", "/a~0b/c~1d")
+	})
+
 	It("should throw an error for invalid paths", func() {
 		_, err := jsonpatch.ConvertPath("a[")
 		Expect(err).To(MatchError(ContainSubstring("unexpected end of input after opening bracket")))
