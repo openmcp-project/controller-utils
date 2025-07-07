@@ -9,6 +9,7 @@
 - [Controller Utility Functions](libs/controller.md)
 - [Custom Resource Definitions](libs/crds.md)
 - [Error Handling](libs/errors.md)
+- [JSON Patch](libs/jsonpatch.md)
 - [Logging](libs/logging.md)
 - [Key-Value Pairs](libs/pairs.md)
 - [Readiness Checks](libs/readiness.md)

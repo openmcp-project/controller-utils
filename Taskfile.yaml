@@ -5,5 +5,7 @@ includes:
     taskfile: hack/common/Taskfile_library.yaml
     flatten: true
     vars:
-      CODE_DIRS: '{{.ROOT_DIR}}/pkg/...'
+      NESTED_MODULES: api
+      API_DIRS: '{{.ROOT_DIR}}/api/...'
+      CODE_DIRS: '{{.ROOT_DIR}}/pkg/... {{.ROOT_DIR}}/api/...'
       GENERATE_DOCS_INDEX: "true"
