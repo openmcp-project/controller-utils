@@ -11,7 +11,7 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
-	github.com/openmcp-project/controller-utils/api v0.0.0-00010101000000-000000000000
+	github.com/openmcp-project/controller-utils/api v0.0.0-20250707072433-c6d1a9a22a66
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
