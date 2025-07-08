@@ -8,6 +8,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/onsi/gomega/types"
+
 	"github.com/openmcp-project/controller-utils/pkg/logging"
 )
 
@@ -48,12 +50,22 @@ func (e *Environment) ShouldEventuallyReconcile(req reconcile.Request, timeout, 
 
 // ShouldNotReconcile calls the given reconciler with the given request and expects an error.
 func (e *Environment) ShouldNotReconcile(req reconcile.Request, optionalDescription ...interface{}) reconcile.Result {
-	return e.shouldNotReconcile(SimpleEnvironmentDefaultKey, req, optionalDescription...)
+	return e.shouldNotReconcile(SimpleEnvironmentDefaultKey, req, nil, optionalDescription...)
 }
 
 // ShouldEventuallyNotReconcile calls the given reconciler with the given request and retries until an error occurred or the timeout is reached.
 func (e *Environment) ShouldEventuallyNotReconcile(req reconcile.Request, timeout, poll time.Duration, optionalDescription ...interface{}) reconcile.Result {
-	return e.shouldEventuallyNotReconcile(SimpleEnvironmentDefaultKey, req, timeout, poll, optionalDescription...)
+	return e.shouldEventuallyNotReconcile(SimpleEnvironmentDefaultKey, req, nil, timeout, poll, optionalDescription...)
+}
+
+// ShouldNotReconcileWithError calls the given reconciler with the given request and expects an error that matches the given matcher.
+func (e *Environment) ShouldNotReconcileWithError(req reconcile.Request, matcher types.GomegaMatcher, optionalDescription ...interface{}) reconcile.Result {
+	return e.shouldNotReconcile(SimpleEnvironmentDefaultKey, req, matcher, optionalDescription...)
+}
+
+// ShouldEventuallyNotReconcileWithError calls the given reconciler with the given request and retries until an error that matches the given matcher occurred or the timeout is reached.
+func (e *Environment) ShouldEventuallyNotReconcileWithError(req reconcile.Request, matcher types.GomegaMatcher, timeout, poll time.Duration, optionalDescription ...interface{}) reconcile.Result {
+	return e.shouldEventuallyNotReconcile(SimpleEnvironmentDefaultKey, req, matcher, timeout, poll, optionalDescription...)
 }
 
 //////////////////////////////////

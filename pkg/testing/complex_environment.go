@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/types"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -18,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/openmcp-project/controller-utils/pkg/logging"
+	"github.com/openmcp-project/controller-utils/pkg/testing/matchers"
 )
 
 /////////////////
@@ -84,27 +86,37 @@ func (e *ComplexEnvironment) shouldEventuallyReconcile(reconciler string, req re
 
 // ShouldNotReconcile calls the given reconciler with the given request and expects an error.
 func (e *ComplexEnvironment) ShouldNotReconcile(reconciler string, req reconcile.Request, optionalDescription ...interface{}) reconcile.Result {
-	return e.shouldNotReconcile(reconciler, req, optionalDescription...)
+	return e.shouldNotReconcile(reconciler, req, nil, optionalDescription...)
 }
 
-func (e *ComplexEnvironment) shouldNotReconcile(reconciler string, req reconcile.Request, optionalDescription ...interface{}) reconcile.Result {
+// ShouldNotReconcileWithError calls the given reconciler with the given request and expects an error that matches the given matcher.
+func (e *ComplexEnvironment) ShouldNotReconcileWithError(reconciler string, req reconcile.Request, matcher types.GomegaMatcher, optionalDescription ...interface{}) reconcile.Result {
+	return e.shouldNotReconcile(reconciler, req, matcher, optionalDescription...)
+}
+
+func (e *ComplexEnvironment) shouldNotReconcile(reconciler string, req reconcile.Request, matcher types.GomegaMatcher, optionalDescription ...interface{}) reconcile.Result {
 	res, err := e.Reconcilers[reconciler].Reconcile(e.Ctx, req)
-	gomega.ExpectWithOffset(2, err).To(gomega.HaveOccurred(), optionalDescription...)
+	gomega.ExpectWithOffset(2, err).To(gomega.And(gomega.HaveOccurred(), matchers.MaybeMatch(matcher)), optionalDescription...)
 	return res
 }
 
 // ShouldEventuallyNotReconcile calls the given reconciler with the given request and retries until an error occurred or the timeout is reached.
 func (e *ComplexEnvironment) ShouldEventuallyNotReconcile(reconciler string, req reconcile.Request, timeout, poll time.Duration, optionalDescription ...interface{}) reconcile.Result {
-	return e.shouldEventuallyNotReconcile(reconciler, req, timeout, poll, optionalDescription...)
+	return e.shouldEventuallyNotReconcile(reconciler, req, nil, timeout, poll, optionalDescription...)
 }
 
-func (e *ComplexEnvironment) shouldEventuallyNotReconcile(reconciler string, req reconcile.Request, timeout, poll time.Duration, optionalDescription ...interface{}) reconcile.Result {
+// ShouldEventuallyNotReconcileWithError calls the given reconciler with the given request and retries until an error that matches the given matcher occurred or the timeout is reached.
+func (e *ComplexEnvironment) ShouldEventuallyNotReconcileWithError(reconciler string, req reconcile.Request, matcher types.GomegaMatcher, timeout, poll time.Duration, optionalDescription ...interface{}) reconcile.Result {
+	return e.shouldEventuallyNotReconcile(reconciler, req, matcher, timeout, poll, optionalDescription...)
+}
+
+func (e *ComplexEnvironment) shouldEventuallyNotReconcile(reconciler string, req reconcile.Request, matcher types.GomegaMatcher, timeout, poll time.Duration, optionalDescription ...interface{}) reconcile.Result {
 	var err error
 	var res reconcile.Result
 	gomega.EventuallyWithOffset(1, func() error {
 		res, err = e.Reconcilers[reconciler].Reconcile(e.Ctx, req)
 		return err
-	}, timeout, poll).ShouldNot(gomega.Succeed(), optionalDescription...)
+	}, timeout, poll).ShouldNot(gomega.And(gomega.Succeed(), matchers.MaybeMatch(matcher)), optionalDescription...)
 	return res
 }
 
