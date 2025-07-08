@@ -57,8 +57,8 @@ func (rc *Client) BackoffMultiplier() float64 {
 	return rc.backoffMultiplier
 }
 
-// MaxRetries returns the configured maximum number of retries.
-func (rc *Client) MaxRetries() int {
+// MaxAttempts returns the configured maximum number of retries.
+func (rc *Client) MaxAttempts() int {
 	return rc.maxAttempts
 }
 
