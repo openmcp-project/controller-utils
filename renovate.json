@@ -26,6 +26,16 @@
         "golang"
       ],
       "rangeStrategy": "bump"
+    },
+    {
+      "description": "Ignore version update for our own API",
+      "matchManagers": [
+        "gomod"
+      ],
+      "enabled": false,
+      "matchPackageNames": [
+        "github.com/openmcp-project/controller-utils/api"
+      ]
     }
   ]
 }
