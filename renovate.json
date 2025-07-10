@@ -3,7 +3,7 @@
   "git-submodules": {
     "enabled": true
   },
-  "minimumReleaseAge": "3 days",
+  "minimumReleaseAge": "0 days",
   "extends": [
     "config:recommended",
     "config:best-practices",
@@ -26,6 +26,16 @@
         "golang"
       ],
       "rangeStrategy": "bump"
+    },
+    {
+      "description": "Ignore version update for our own API",
+      "matchManagers": [
+        "gomod"
+      ],
+      "enabled": false,
+      "matchPackageNames": [
+        "github.com/openmcp-project/controller-utils/api"
+      ]
     }
   ]
 }
