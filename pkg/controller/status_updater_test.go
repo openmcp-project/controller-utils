@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/openmcp-project/controller-utils/pkg/conditions"
 	. "github.com/openmcp-project/controller-utils/pkg/testing/matchers"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 
-	"github.com/openmcp-project/controller-utils/pkg/conditions"
 	"github.com/openmcp-project/controller-utils/pkg/controller"
 	"github.com/openmcp-project/controller-utils/pkg/errors"
 	testutils "github.com/openmcp-project/controller-utils/pkg/testing"
@@ -30,7 +30,7 @@ var _ = Describe("Status Updater", func() {
 		env := testutils.NewEnvironmentBuilder().WithFakeClient(coScheme).WithInitObjectPath("testdata", "test-02").WithDynamicObjectsWithStatus(&CustomObject{}).Build()
 		obj := &CustomObject{}
 		Expect(env.Client().Get(env.Ctx, controller.ObjectKey("nostatus", "default"), obj)).To(Succeed())
-		rr := controller.ReconcileResult[*CustomObject, ConditionStatus]{
+		rr := controller.ReconcileResult[*CustomObject]{
 			Object:         obj,
 			ReconcileError: errors.WithReason(fmt.Errorf("test error"), "TestError"),
 			Conditions:     dummyConditions(),
@@ -49,24 +49,26 @@ var _ = Describe("Status Updater", func() {
 		Expect(obj.Status.Message).To(ContainSubstring("test error"))
 		Expect(obj.Status.LastReconcileTime.Time).To(BeTemporally("~", now, 1*time.Second))
 		Expect(obj.Status.Conditions).To(ConsistOf(
-			MatchCondition(NewConditionImpl[ConditionStatus]().
+			MatchCondition(TestCondition().
 				WithType("TestConditionTrue").
-				WithStatus(ConditionStatusTrue).
+				WithStatus(metav1.ConditionTrue).
+				WithObservedGeneration(10).
 				WithReason("TestReasonTrue").
 				WithMessage("TestMessageTrue").
-				WithLastTransitionTime(obj.Status.LastReconcileTime.Time)),
-			MatchCondition(NewConditionImpl[ConditionStatus]().
+				WithLastTransitionTime(obj.Status.LastReconcileTime)),
+			MatchCondition(TestCondition().
 				WithType("TestConditionFalse").
-				WithStatus(ConditionStatusFalse).
+				WithStatus(metav1.ConditionFalse).
+				WithObservedGeneration(10).
 				WithReason("TestReasonFalse").
 				WithMessage("TestMessageFalse").
-				WithLastTransitionTime(obj.Status.LastReconcileTime.Time)),
+				WithLastTransitionTime(obj.Status.LastReconcileTime)),
 		))
 	})
 
 	It("should not hide a reconciliation error if the object is nil", func() {
 		env := testutils.NewEnvironmentBuilder().WithFakeClient(coScheme).WithInitObjectPath("testdata", "test-02").WithDynamicObjectsWithStatus(&CustomObject{}).Build()
-		rr := controller.ReconcileResult[*CustomObject, ConditionStatus]{
+		rr := controller.ReconcileResult[*CustomObject]{
 			ReconcileError: errors.WithReason(fmt.Errorf("test error"), "TestError"),
 		}
 		su := preconfiguredStatusUpdaterBuilder().Build()
@@ -78,11 +80,12 @@ var _ = Describe("Status Updater", func() {
 		env := testutils.NewEnvironmentBuilder().WithFakeClient(coScheme).WithInitObjectPath("testdata", "test-02").WithDynamicObjectsWithStatus(&CustomObject{}).Build()
 		obj := &CustomObject{}
 		Expect(env.Client().Get(env.Ctx, controller.ObjectKey("status", "default"), obj)).To(Succeed())
-		rr := controller.ReconcileResult[*CustomObject, ConditionStatus]{
+		oldTransitionTime := conditions.GetCondition(obj.Status.Conditions, "TestConditionTrue").LastTransitionTime
+		rr := controller.ReconcileResult[*CustomObject]{
 			Object:     obj,
 			Conditions: dummyConditions(),
 		}
-		su := preconfiguredStatusUpdaterBuilder().WithPhaseUpdateFunc(func(obj *CustomObject, rr controller.ReconcileResult[*CustomObject, ConditionStatus]) (CustomObjectPhase, error) {
+		su := preconfiguredStatusUpdaterBuilder().WithPhaseUpdateFunc(func(obj *CustomObject, rr controller.ReconcileResult[*CustomObject]) (string, error) {
 			return PhaseSucceeded, nil
 		}).Build()
 		now := time.Now()
@@ -97,18 +100,20 @@ var _ = Describe("Status Updater", func() {
 		Expect(obj.Status.Message).To(BeEmpty())
 		Expect(obj.Status.LastReconcileTime.Time).To(BeTemporally("~", now, 1*time.Second))
 		Expect(obj.Status.Conditions).To(ConsistOf(
-			MatchCondition(NewConditionImpl[ConditionStatus]().
+			MatchCondition(TestCondition().
 				WithType("TestConditionTrue").
-				WithStatus(ConditionStatusTrue).
+				WithStatus(metav1.ConditionTrue).
+				WithObservedGeneration(10).
 				WithReason("TestReasonTrue").
 				WithMessage("TestMessageTrue").
-				WithLastTransitionTime(obj.Status.LastReconcileTime.Time)),
-			MatchCondition(NewConditionImpl[ConditionStatus]().
+				WithLastTransitionTime(oldTransitionTime)),
+			MatchCondition(TestCondition().
 				WithType("TestConditionFalse").
-				WithStatus(ConditionStatusFalse).
+				WithStatus(metav1.ConditionFalse).
+				WithObservedGeneration(10).
 				WithReason("TestReasonFalse").
 				WithMessage("TestMessageFalse").
-				WithLastTransitionTime(obj.Status.LastReconcileTime.Time)),
+				WithLastTransitionTime(obj.Status.LastReconcileTime)),
 		))
 	})
 
@@ -116,6 +121,7 @@ var _ = Describe("Status Updater", func() {
 		env := testutils.NewEnvironmentBuilder().WithFakeClient(coScheme).WithInitObjectPath("testdata", "test-02").WithDynamicObjectsWithStatus(&CustomObject{}).Build()
 		obj := &CustomObject{}
 		Expect(env.Client().Get(env.Ctx, controller.ObjectKey("status", "default"), obj)).To(Succeed())
+		oldTransitionTime := conditions.GetCondition(obj.Status.Conditions, "TestConditionTrue").LastTransitionTime
 		before := obj.DeepCopy()
 		for _, disabledField := range controller.AllStatusFields() {
 			By(fmt.Sprintf("Testing disabled field %s", disabledField))
@@ -123,16 +129,16 @@ var _ = Describe("Status Updater", func() {
 			modified := obj.DeepCopy()
 			obj.Status = before.Status
 			Expect(env.Client().Status().Patch(env.Ctx, obj, client.MergeFrom(modified))).To(Succeed())
-			rr := controller.ReconcileResult[*CustomObject, ConditionStatus]{
+			rr := controller.ReconcileResult[*CustomObject]{
 				Object:     obj,
 				Conditions: dummyConditions(),
 				Reason:     "TestReason",
 				Message:    "TestMessage",
 			}
-			su := preconfiguredStatusUpdaterBuilder().WithPhaseUpdateFunc(func(obj *CustomObject, rr controller.ReconcileResult[*CustomObject, ConditionStatus]) (CustomObjectPhase, error) {
+			su := preconfiguredStatusUpdaterBuilder().WithPhaseUpdateFunc(func(obj *CustomObject, rr controller.ReconcileResult[*CustomObject]) (string, error) {
 				return PhaseSucceeded, nil
 			}).WithoutFields(disabledField).Build()
-			now := time.Now()
+			now := metav1.Now()
 			res, err := su.UpdateStatus(env.Ctx, env.Client(), rr)
 			Expect(res).To(Equal(rr.Result))
 
@@ -162,22 +168,23 @@ var _ = Describe("Status Updater", func() {
 			if disabledField == controller.STATUS_FIELD_LAST_RECONCILE_TIME {
 				Expect(obj.Status.LastReconcileTime.Time).To(Equal(before.Status.LastReconcileTime.Time))
 			} else {
-				Expect(obj.Status.LastReconcileTime.Time).To(BeTemporally("~", now, 1*time.Second))
+				Expect(obj.Status.LastReconcileTime.Time).To(BeTemporally("~", now.Time, 1*time.Second))
 			}
 			if disabledField == controller.STATUS_FIELD_CONDITIONS {
 				Expect(obj.Status.Conditions).To(Equal(before.Status.Conditions))
 			} else {
 				Expect(obj.Status.Conditions).To(ConsistOf(
-					MatchCondition(NewConditionImpl[ConditionStatus]().
+					MatchCondition(TestCondition().
 						WithType("TestConditionTrue").
-						WithStatus(ConditionStatusTrue).
+						WithStatus(metav1.ConditionTrue).
+						WithObservedGeneration(10).
 						WithReason("TestReasonTrue").
 						WithMessage("TestMessageTrue").
-						WithLastTransitionTime(now).
-						WithTimestampTolerance(1*time.Second)),
-					MatchCondition(NewConditionImpl[ConditionStatus]().
+						WithLastTransitionTime(oldTransitionTime)),
+					MatchCondition(TestCondition().
 						WithType("TestConditionFalse").
-						WithStatus(ConditionStatusFalse).
+						WithStatus(metav1.ConditionFalse).
+						WithObservedGeneration(10).
 						WithReason("TestReasonFalse").
 						WithMessage("TestMessageFalse").
 						WithLastTransitionTime(now).
@@ -189,39 +196,41 @@ var _ = Describe("Status Updater", func() {
 
 })
 
-func preconfiguredStatusUpdaterBuilder() *controller.StatusUpdaterBuilder[*CustomObject, CustomObjectPhase, ConditionStatus] {
+func preconfiguredStatusUpdaterBuilder() *controller.StatusUpdaterBuilder[*CustomObject] {
 	nestedFields := controller.AllStatusFields()
 	phaseIdx := slices.Index(nestedFields, controller.STATUS_FIELD_PHASE)
 	if phaseIdx >= 0 {
 		nestedFields = slices.Delete(nestedFields, phaseIdx, phaseIdx+1)
 	}
-	return controller.NewStatusUpdaterBuilder[*CustomObject, CustomObjectPhase, ConditionStatus]().WithNestedStruct("CommonStatus", nestedFields...).WithPhaseUpdateFunc(dummyPhaseUpdateFunc).WithConditionUpdater(func() conditions.Condition[ConditionStatus] { return &Condition{} }, true)
+	return controller.NewStatusUpdaterBuilder[*CustomObject]().WithNestedStruct("CommonStatus", nestedFields...).WithPhaseUpdateFunc(dummyPhaseUpdateFunc).WithConditionUpdater(true)
 }
 
-func dummyConditions() []conditions.Condition[ConditionStatus] {
-	return []conditions.Condition[ConditionStatus]{
-		&Condition{
-			Type:    "TestConditionTrue",
-			Status:  ConditionStatusTrue,
-			Reason:  "TestReasonTrue",
-			Message: "TestMessageTrue",
+func dummyConditions() []metav1.Condition {
+	return []metav1.Condition{
+		{
+			Type:               "TestConditionTrue",
+			Status:             metav1.ConditionTrue,
+			ObservedGeneration: 10,
+			Reason:             "TestReasonTrue",
+			Message:            "TestMessageTrue",
 		},
-		&Condition{
-			Type:    "TestConditionFalse",
-			Status:  ConditionStatusFalse,
-			Reason:  "TestReasonFalse",
-			Message: "TestMessageFalse",
+		{
+			Type:               "TestConditionFalse",
+			Status:             metav1.ConditionFalse,
+			ObservedGeneration: 10,
+			Reason:             "TestReasonFalse",
+			Message:            "TestMessageFalse",
 		},
 	}
 }
 
-func dummyPhaseUpdateFunc(obj *CustomObject, rr controller.ReconcileResult[*CustomObject, ConditionStatus]) (CustomObjectPhase, error) {
+func dummyPhaseUpdateFunc(obj *CustomObject, rr controller.ReconcileResult[*CustomObject]) (string, error) {
 	if rr.ReconcileError != nil {
 		return PhaseFailed, nil
 	}
 	if len(obj.Status.Conditions) > 0 {
 		for _, con := range obj.Status.Conditions {
-			if con.GetStatus() != ConditionStatusTrue {
+			if con.Status != metav1.ConditionTrue {
 				return PhaseFailed, nil
 			}
 		}
@@ -251,82 +260,13 @@ type CustomObjectStatus struct {
 	CommonStatus `json:",inline"`
 
 	// Phase is the current phase of the cluster.
-	Phase CustomObjectPhase `json:"phase"`
+	Phase string `json:"phase"`
 }
-
-type CustomObjectPhase string
 
 const (
-	PhaseSucceeded CustomObjectPhase = "Succeeded"
-	PhaseFailed    CustomObjectPhase = "Failed"
+	PhaseSucceeded = "Succeeded"
+	PhaseFailed    = "Failed"
 )
-
-type ConditionStatus string
-
-const (
-	ConditionStatusTrue    ConditionStatus = "True"
-	ConditionStatusFalse   ConditionStatus = "False"
-	ConditionStatusUnknown ConditionStatus = "Unknown"
-)
-
-type Condition struct {
-	// Type is the type of the condition.
-	// Must be unique within the resource.
-	Type string `json:"type"`
-
-	// Status is the status of the condition.
-	Status ConditionStatus `json:"status"`
-
-	// Reason is expected to contain a CamelCased string that provides further information regarding the condition.
-	// It should have a fixed value set (like an enum) to be machine-readable. The value set depends on the condition type.
-	// It is optional, but should be filled at least when Status is not "True".
-	// +optional
-	Reason string `json:"reason,omitempty"`
-
-	// Message contains further details regarding the condition.
-	// It is meant for human users, Reason should be used for programmatic evaluation instead.
-	// It is optional, but should be filled at least when Status is not "True".
-	// +optional
-	Message string `json:"message,omitempty"`
-
-	// LastTransitionTime specifies the time when this condition's status last changed.
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
-}
-
-// Implement the Condition interface from our controller-utils library
-func (c *Condition) GetType() string {
-	return c.Type
-}
-func (c *Condition) SetType(t string) {
-	c.Type = t
-}
-func (c *Condition) GetStatus() ConditionStatus {
-	return c.Status
-}
-func (c *Condition) SetStatus(s ConditionStatus) {
-	c.Status = s
-}
-func (c *Condition) GetReason() string {
-	return c.Reason
-}
-func (c *Condition) SetReason(r string) {
-	c.Reason = r
-}
-func (c *Condition) GetMessage() string {
-	return c.Message
-}
-func (c *Condition) SetMessage(m string) {
-	c.Message = m
-}
-func (c *Condition) GetLastTransitionTime() time.Time {
-	return c.LastTransitionTime.Time
-}
-func (c *Condition) SetLastTransitionTime(t time.Time) {
-	c.LastTransitionTime = metav1.NewTime(t)
-}
-
-// ConditionList is a list of Conditions.
-type ConditionList []Condition
 
 type CommonStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration"`
@@ -344,7 +284,7 @@ type CommonStatus struct {
 
 	// Conditions contains the conditions.
 	// +optional
-	Conditions ConditionList `json:"conditions,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 type CustomObjectList struct {
@@ -359,7 +299,7 @@ func (in *CommonStatus) DeepCopyInto(out *CommonStatus) {
 	in.LastReconcileTime.DeepCopyInto(&out.LastReconcileTime)
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
-		*out = make(ConditionList, len(*in))
+		*out = make([]metav1.Condition, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -374,43 +314,6 @@ func (in *CommonStatus) DeepCopy() *CommonStatus {
 	out := new(CommonStatus)
 	in.DeepCopyInto(out)
 	return out
-}
-
-// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
-func (in *Condition) DeepCopyInto(out *Condition) {
-	*out = *in
-	in.LastTransitionTime.DeepCopyInto(&out.LastTransitionTime)
-}
-
-// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new Condition.
-func (in *Condition) DeepCopy() *Condition {
-	if in == nil {
-		return nil
-	}
-	out := new(Condition)
-	in.DeepCopyInto(out)
-	return out
-}
-
-// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
-func (in ConditionList) DeepCopyInto(out *ConditionList) {
-	{
-		in := &in
-		*out = make(ConditionList, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
-}
-
-// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new ConditionList.
-func (in ConditionList) DeepCopy() ConditionList {
-	if in == nil {
-		return nil
-	}
-	out := new(ConditionList)
-	in.DeepCopyInto(out)
-	return *out
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
