@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/openmcp-project/controller-utils/pkg/conditions"
 	"github.com/openmcp-project/controller-utils/pkg/errors"
@@ -16,16 +15,16 @@ import (
 )
 
 // NewStatusUpdaterBuilder initializes a new StatusUpdaterBuilder.
-func NewStatusUpdaterBuilder[Obj client.Object, PhType ~string, ConType comparable]() *StatusUpdaterBuilder[Obj, PhType, ConType] {
-	return &StatusUpdaterBuilder[Obj, PhType, ConType]{
-		internal: newStatusUpdater[Obj, PhType, ConType](),
+func NewStatusUpdaterBuilder[Obj client.Object]() *StatusUpdaterBuilder[Obj] {
+	return &StatusUpdaterBuilder[Obj]{
+		internal: newStatusUpdater[Obj](),
 	}
 }
 
 // StatusUpdaterBuilder is a builder for creating a status updater.
 // Do not use this directly, use NewStatusUpdaterBuilder() instead.
-type StatusUpdaterBuilder[Obj client.Object, PhType ~string, ConType comparable] struct {
-	internal *statusUpdater[Obj, PhType, ConType]
+type StatusUpdaterBuilder[Obj client.Object] struct {
+	internal *statusUpdater[Obj]
 }
 
 // WithFieldOverride overwrites the name of the field.
@@ -40,7 +39,7 @@ type StatusUpdaterBuilder[Obj client.Object, PhType ~string, ConType comparable]
 // - STATUS_FIELD_REASON: "Reason"
 // - STATUS_FIELD_MESSAGE: "Message"
 // - STATUS_FIELD_PHASE: "Phase"
-func (b *StatusUpdaterBuilder[Obj, PhType, ConType]) WithFieldOverride(field StatusField, name string) *StatusUpdaterBuilder[Obj, PhType, ConType] {
+func (b *StatusUpdaterBuilder[Obj]) WithFieldOverride(field StatusField, name string) *StatusUpdaterBuilder[Obj] {
 	if name == "" {
 		delete(b.internal.fieldNames, field)
 	} else {
@@ -50,7 +49,7 @@ func (b *StatusUpdaterBuilder[Obj, PhType, ConType]) WithFieldOverride(field Sta
 }
 
 // WithFieldOverrides is a wrapper around WithFieldOverride that allows to apply multiple overrides at once.
-func (b *StatusUpdaterBuilder[Obj, PhType, ConType]) WithFieldOverrides(overrides map[StatusField]string) *StatusUpdaterBuilder[Obj, PhType, ConType] {
+func (b *StatusUpdaterBuilder[Obj]) WithFieldOverrides(overrides map[StatusField]string) *StatusUpdaterBuilder[Obj] {
 	for field, name := range overrides {
 		b.WithFieldOverride(field, name)
 	}
@@ -60,7 +59,7 @@ func (b *StatusUpdaterBuilder[Obj, PhType, ConType]) WithFieldOverrides(override
 // WithNestedStruct is a helper for easily updating the field names if some or all of the fields are wrapped in a nested struct within the status.
 // Basically, the field names for all specified fields are prefixed with '<name>.', unless the field is empty (which disables the field).
 // If appliesTo is empty, all fields are assumed to be nested (except for the status itself).
-func (b *StatusUpdaterBuilder[Obj, PhType, ConType]) WithNestedStruct(name string, appliesTo ...StatusField) *StatusUpdaterBuilder[Obj, PhType, ConType] {
+func (b *StatusUpdaterBuilder[Obj]) WithNestedStruct(name string, appliesTo ...StatusField) *StatusUpdaterBuilder[Obj] {
 	if len(appliesTo) == 0 {
 		appliesTo = AllStatusFields()
 	}
@@ -77,7 +76,7 @@ func (b *StatusUpdaterBuilder[Obj, PhType, ConType]) WithNestedStruct(name strin
 // WithoutFields removes the specified fields from the status update.
 // It basically calls WithFieldOverride(field, "") for each field.
 // This can be used in combination with AllStatusFields() to disable all fields.
-func (b *StatusUpdaterBuilder[Obj, PhType, ConType]) WithoutFields(fields ...StatusField) *StatusUpdaterBuilder[Obj, PhType, ConType] {
+func (b *StatusUpdaterBuilder[Obj]) WithoutFields(fields ...StatusField) *StatusUpdaterBuilder[Obj] {
 	for _, field := range fields {
 		b.WithFieldOverride(field, "")
 	}
@@ -86,18 +85,17 @@ func (b *StatusUpdaterBuilder[Obj, PhType, ConType]) WithoutFields(fields ...Sta
 
 // WithConditionUpdater must be called if the conditions should be updated, because this requires some additional information.
 // Note that the conditions will only be updated if this method has been called (with a non-nil condition constructor) AND the conditions field has not been disabled.
-func (b *StatusUpdaterBuilder[Obj, PhType, ConType]) WithConditionUpdater(construct func() conditions.Condition[ConType], removeUntouchedConditions bool) *StatusUpdaterBuilder[Obj, PhType, ConType] {
-	b.internal.conConstruct = construct
+func (b *StatusUpdaterBuilder[Obj]) WithConditionUpdater(removeUntouchedConditions bool) *StatusUpdaterBuilder[Obj] {
 	b.internal.removeUntouchedConditions = removeUntouchedConditions
 	return b
 }
 
 // WithPhaseUpdateFunc sets the function that determines the phase of the object.
-// It is strongly recommended to either disable the phase field or override this function, because the default will simply set the Phase to the zero value of PhType.
+// It is strongly recommended to either disable the phase field or override this function, because the default will simply set the Phase to an empty string.
 // The function is called with a deep copy of the object, after all other status updates have been applied (except for the custom update).
 // If the returned error is nil, the object's phase is then set to the returned value.
 // Setting this to nil causes the default phase update function to be used. To disable the phase update altogether, use WithoutField(STATUS_FIELD_PHASE).
-func (b *StatusUpdaterBuilder[Obj, PhType, ConType]) WithPhaseUpdateFunc(f func(obj Obj, rr ReconcileResult[Obj, ConType]) (PhType, error)) *StatusUpdaterBuilder[Obj, PhType, ConType] {
+func (b *StatusUpdaterBuilder[Obj]) WithPhaseUpdateFunc(f func(obj Obj, rr ReconcileResult[Obj]) (string, error)) *StatusUpdaterBuilder[Obj] {
 	b.internal.phaseUpdateFunc = f
 	return b
 }
@@ -107,13 +105,13 @@ func (b *StatusUpdaterBuilder[Obj, PhType, ConType]) WithPhaseUpdateFunc(f func(
 // It gets the original object passed in and can modify it directly.
 // Note that only changes to the status field are sent to the cluster.
 // Set this to nil to disable the custom update (it is nil by default).
-func (b *StatusUpdaterBuilder[Obj, PhType, ConType]) WithCustomUpdateFunc(f func(obj Obj, rr ReconcileResult[Obj, ConType]) error) *StatusUpdaterBuilder[Obj, PhType, ConType] {
+func (b *StatusUpdaterBuilder[Obj]) WithCustomUpdateFunc(f func(obj Obj, rr ReconcileResult[Obj]) error) *StatusUpdaterBuilder[Obj] {
 	b.internal.customUpdateFunc = f
 	return b
 }
 
 // Build returns the status updater.
-func (b *StatusUpdaterBuilder[Obj, PhType, ConType]) Build() *statusUpdater[Obj, PhType, ConType] {
+func (b *StatusUpdaterBuilder[Obj]) Build() *statusUpdater[Obj] {
 	return b.internal
 }
 
@@ -143,16 +141,15 @@ func AllStatusFields() []StatusField {
 	}
 }
 
-type statusUpdater[Obj client.Object, PhType ~string, ConType comparable] struct {
+type statusUpdater[Obj client.Object] struct {
 	fieldNames                map[StatusField]string
-	phaseUpdateFunc           func(obj Obj, rr ReconcileResult[Obj, ConType]) (PhType, error)
-	customUpdateFunc          func(obj Obj, rr ReconcileResult[Obj, ConType]) error
-	conConstruct              func() conditions.Condition[ConType]
+	phaseUpdateFunc           func(obj Obj, rr ReconcileResult[Obj]) (string, error)
+	customUpdateFunc          func(obj Obj, rr ReconcileResult[Obj]) error
 	removeUntouchedConditions bool
 }
 
-func newStatusUpdater[Obj client.Object, PhType ~string, ConType comparable]() *statusUpdater[Obj, PhType, ConType] {
-	return &statusUpdater[Obj, PhType, ConType]{
+func newStatusUpdater[Obj client.Object]() *statusUpdater[Obj] {
+	return &statusUpdater[Obj]{
 		fieldNames: map[StatusField]string{
 			STATUS_FIELD:                     string(STATUS_FIELD),
 			STATUS_FIELD_OBSERVED_GENERATION: string(STATUS_FIELD_OBSERVED_GENERATION),
@@ -162,21 +159,20 @@ func newStatusUpdater[Obj client.Object, PhType ~string, ConType comparable]() *
 			STATUS_FIELD_MESSAGE:             string(STATUS_FIELD_MESSAGE),
 			STATUS_FIELD_PHASE:               string(STATUS_FIELD_PHASE),
 		},
-		phaseUpdateFunc: defaultPhaseUpdateFunc[Obj, PhType, ConType],
+		phaseUpdateFunc: defaultPhaseUpdateFunc[Obj],
 	}
 }
 
-func defaultPhaseUpdateFunc[Obj client.Object, PhType ~string, ConType comparable](obj Obj, _ ReconcileResult[Obj, ConType]) (PhType, error) {
+func defaultPhaseUpdateFunc[Obj client.Object](obj Obj, _ ReconcileResult[Obj]) (string, error) {
 	// Default phase update function does nothing.
 	// This should be overridden by the caller.
-	var zero PhType
-	return zero, nil
+	return "", nil
 }
 
 // UpdateStatus updates the status of the object in the given ReconcileResult, using the previously set field names and functions.
 // The object is expected to be a pointer to a struct with the status field.
 // If the 'Object' field in the ReconcileResult is nil, the status update becomes a no-op.
-func (s *statusUpdater[Obj, PhType, ConType]) UpdateStatus(ctx context.Context, c client.Client, rr ReconcileResult[Obj, ConType]) (ctrl.Result, error) {
+func (s *statusUpdater[Obj]) UpdateStatus(ctx context.Context, c client.Client, rr ReconcileResult[Obj]) (ctrl.Result, error) {
 	errs := errors.NewReasonableErrorList(rr.ReconcileError)
 	if IsNil(rr.Object) {
 		return rr.Result, errs.Aggregate()
@@ -194,9 +190,9 @@ func (s *statusUpdater[Obj, PhType, ConType]) UpdateStatus(ctx context.Context, 
 		return rr.Result, errs.Aggregate()
 	}
 
-	now := time.Now()
+	now := metav1.Now()
 	if s.fieldNames[STATUS_FIELD_LAST_RECONCILE_TIME] != "" {
-		SetField(status, s.fieldNames[STATUS_FIELD_LAST_RECONCILE_TIME], metav1.NewTime(now))
+		SetField(status, s.fieldNames[STATUS_FIELD_LAST_RECONCILE_TIME], now)
 	}
 	if s.fieldNames[STATUS_FIELD_OBSERVED_GENERATION] != "" {
 		SetField(status, s.fieldNames[STATUS_FIELD_OBSERVED_GENERATION], rr.Object.GetGeneration())
@@ -215,53 +211,20 @@ func (s *statusUpdater[Obj, PhType, ConType]) UpdateStatus(ctx context.Context, 
 		}
 		SetField(status, s.fieldNames[STATUS_FIELD_REASON], reason)
 	}
-	if s.fieldNames[STATUS_FIELD_CONDITIONS] != "" && s.conConstruct != nil {
-		conType := reflect.TypeOf(s.conConstruct())
-		targetType := reflect.TypeOf(GetField(status, s.fieldNames[STATUS_FIELD_CONDITIONS], false))
-		pointerMagic := false
-		if !reflect.SliceOf(conType).AssignableTo(targetType) {
-			// this can happen if the constructor returns a *ConditionImplementation,
-			// but the condition list field is a []ConditionImplementation
-			if conType.Kind() == reflect.Ptr {
-				pointerMagic = true
-				conType = conType.Elem()
-			}
-		}
-		oldConsRaw := GetField(status, s.fieldNames[STATUS_FIELD_CONDITIONS], false)
-		var oldCons []conditions.Condition[ConType]
-		if !IsNil(oldConsRaw) {
-			val := reflect.ValueOf(oldConsRaw)
-			oldCons := make([]conditions.Condition[ConType], val.Len())
-			for i := 0; i < val.Len(); i++ {
-				eVal := val.Index(i)
-				if pointerMagic {
-					ptrValue := reflect.New(conType)
-					reflect.Indirect(ptrValue).Set(eVal)
-					eVal = ptrValue
-				}
-				oldCons[i] = eVal.Interface().(conditions.Condition[ConType])
-			}
-		}
-		cu := conditions.ConditionUpdater(s.conConstruct, oldCons, s.removeUntouchedConditions)
+	if s.fieldNames[STATUS_FIELD_CONDITIONS] != "" {
+		oldCons := GetField(status, s.fieldNames[STATUS_FIELD_CONDITIONS], false).([]metav1.Condition)
+		cu := conditions.ConditionUpdater(oldCons, s.removeUntouchedConditions)
 		cu.Now = now
 		for _, con := range rr.Conditions {
 			cu.UpdateConditionFromTemplate(con)
 		}
-		newConsRaw, _ := cu.Conditions()
-		newCons := reflect.MakeSlice(reflect.SliceOf(conType), len(newConsRaw), len(newConsRaw)).Interface()
-		for i := range newConsRaw {
-			val := reflect.ValueOf(newConsRaw[i])
-			if pointerMagic {
-				val = val.Elem()
-			}
-			reflect.ValueOf(newCons).Index(i).Set(val.Convert(conType))
-		}
+		newCons, _ := cu.Conditions()
 		SetField(status, s.fieldNames[STATUS_FIELD_CONDITIONS], newCons)
 	}
 	if s.fieldNames[STATUS_FIELD_PHASE] != "" {
 		phase, err := s.phaseUpdateFunc(rr.Object, rr)
 		if err != nil {
-			phase, _ = defaultPhaseUpdateFunc[Obj, PhType, ConType](rr.Object, rr)
+			phase, _ = defaultPhaseUpdateFunc(rr.Object, rr)
 			errs.Append(fmt.Errorf("error computing phase: %w", err))
 		}
 		SetField(status, s.fieldNames[STATUS_FIELD_PHASE], phase)
@@ -364,7 +327,7 @@ func IsSameObject[T any](a, b T) bool {
 // The result of a reconciliation.
 // Obj is the k8s resource that is reconciled.
 // ConType is the type of the "Status" field of the condition, usually a string alias. Simply use string if your object's status does not have conditions.
-type ReconcileResult[Obj client.Object, ConType comparable] struct {
+type ReconcileResult[Obj client.Object] struct {
 	// The old object, before it was modified.
 	// Basically, if OldObject.Status differs from Object.Status, the status will be patched during status updating.
 	// May be nil, in this case only the status metadata (observedGeneration etc.) is updated.
@@ -386,5 +349,5 @@ type ReconcileResult[Obj client.Object, ConType comparable] struct {
 	// Conditions contains a list of conditions that should be updated on the object.
 	// Also note that names of conditions are globally unique, so take care to avoid conflicts with other objects.
 	// The lastTransition timestamp of the condition will be overwritten with the current time while updating.
-	Conditions []conditions.Condition[ConType]
+	Conditions []metav1.Condition
 }

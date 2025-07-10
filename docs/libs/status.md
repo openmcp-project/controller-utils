@@ -3,34 +3,19 @@
 ## Conditions
 
 The `pkg/conditions` package helps with managing condition lists which can often be found in the status of k8s resources.
+It expects the conditions to be of the `Condition` type from the `k8s.io/apimachinery/pkg/apis/meta/v1` package.
 
-The managed condition implementation must satisfy the `Condition[T comparable]` interface:
-```go
-type Condition[T comparable] interface {
-	GetType() string
-	SetType(conType string)
-	GetStatus() T
-	SetStatus(status T)
-	GetLastTransitionTime() time.Time
-	SetLastTransitionTime(timestamp time.Time)
-	GetReason() string
-	SetReason(reason string)
-	GetMessage() string
-	SetMessage(message string)
-}
-```
-
-To manage conditions, use the `ConditionUpdater` function and pass in a constructor function for your condition implementation and the old list of conditions. The bool argument determines whether old conditions that are not updated remain in the returned list (`false`) or are removed, so that the returned list contains only the conditions that were touched (`true`).
+To manage conditions, use the `ConditionUpdater` function and pass in the old list of conditions. The bool argument determines whether old conditions that are not updated remain in the returned list (`false`) or are removed, so that the returned list contains only the conditions that were touched (`true`).
 
 ```go
-updater := conditions.ConditionUpdater(func() conditions.Condition[bool] { return &conImpl{} }, oldCons, false)
+updater := conditions.ConditionUpdater(oldCons, false)
 ```
 
 Note that the `ConditionUpdater` stores the current time upon initialization and will set each updated condition's timestamp to this value, if the status of that condition changed as a result of the update. To use a different timestamp, manually overwrite the `Now` field of the updater.
 
 Use `UpdateCondition` or `UpdateConditionFromTemplate` to update a condition:
 ```go
-updater.UpdateCondition("myCondition", true, "newReason", "newMessage")
+updater.UpdateCondition("myCondition", conditions.FromBool(true), myObj.Generation, "newReason", "newMessage")
 ```
 
 If all conditions are updated, use the `Conditions` method to generate the new list of conditions. The originally passed in list of conditions is not modified by the updater.
@@ -41,7 +26,7 @@ updatedCons, changed := updater.Conditions()
 
 For simplicity, all commands can be chained:
 ```go
-updatedCons, changed := conditions.ConditionUpdater(func() conditions.Condition[bool] { return &conImpl{} }, oldCons, false).UpdateCondition("myCondition", true, "newReason", "newMessage").Conditions()
+updatedCons, changed := conditions.ConditionUpdater(oldCons, false).UpdateCondition("myCondition", conditions.FromBool(true), myObj.Generation, "newReason", "newMessage").Conditions()
 ```
 
 ## Status Updater
@@ -68,7 +53,7 @@ type MyStatus struct {
 
 	// Conditions contains the conditions.
 	// +optional
-	Conditions []MyCondition `json:"conditions,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 ```
 
@@ -82,49 +67,37 @@ import (
 )
 
 // optional, using a type alias removes the need to specify the type arguments every time
-type ReconcileResult = ctrlutils.ReconcileResult[*v1alpha1.MyResource, v1alpha1.ConditionStatus]
+type ReconcileResult = ctrlutils.ReconcileResult[*v1alpha1.MyResource]
 
 // this is the method called by the controller-runtime
-func (r *GardenerMyResourceReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+func (r *MyResourceReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	rr := r.reconcile(ctx, req)
 	// status update
-	return ctrlutils.NewStatusUpdaterBuilder[*v1alpha1.MyResource, v1alpha1.MyResourcePhase, v1alpha1.ConditionStatus]().
-		WithPhaseUpdateFunc(func(obj *v1alpha1.MyResource, rr ctrlutils.ReconcileResult[*v1alpha1.MyResource, v1alpha1.ConditionStatus]) (v1alpha1.MyResourcePhase, error) {
+	return ctrlutils.NewStatusUpdaterBuilder[*v1alpha1.MyResource]().
+		WithPhaseUpdateFunc(func(obj *v1alpha1.MyResource, rr ReconcileResult) (v1alpha1.MyResourcePhase, error) {
 			if rr.ReconcileError != nil {
-				return v1alpha1.PROVIDER_CONFIG_PHASE_FAILED, nil
+				return v1alpha1.MY_PHASE_FAILED, nil
 			}
 			if len(rr.Conditions) > 0 {
 				for _, con := range rr.Conditions {
 					if con.GetStatus() != v1alpha1.CONDITION_TRUE {
-						return v1alpha1.PROVIDER_CONFIG_PHASE_FAILED, nil
+						return v1alpha1.MY_PHASE_FAILED, nil
 					}
 				}
 			}
-			return v1alpha1.PROVIDER_CONFIG_PHASE_SUCCEEDED, nil
+			return v1alpha1.MY_PHASE_SUCCEEDED, nil
 		}).
-		WithConditionUpdater(func() conditions.Condition[v1alpha1.ConditionStatus] {
-			return &v1alpha1.Condition{}
-		}, true).
+		WithConditionUpdater(true).
 		Build().
 		UpdateStatus(ctx, r.PlatformCluster.Client(), rr)
 }
 
-func (r *GardenerProviderConfigReconciler) reconcile(ctx context.Context, req reconcile.Request) ReconcileResult {
+func (r *MyResourceReconciler) reconcile(ctx context.Context, req reconcile.Request) ReconcileResult {
 	// actual reconcile logic here
 }
 ```
 
-Some information regarding the example:
-- `v1alpha1.MyResource` is the resource type being reconciled in this example.
-- `v1alpha1.MyResourcePhase` is the type of the `Phase` field used in the status of `MyResource`.
-	- It must be a string-like type, e.g. `type MyResourcePhase string`.
-	- If the resource status doesn't have a `Phase` or updating it is not desired, simply set this type argument to `string`.
-- `v1alpha1.ConditionStatus` is the type of the `Status` field within the conditions. It must be `comparable`.
-	- Usually, this will either be a boolean or a string-like type.
-	- If the resource status doesn't have conditions or updating them is not desired, simply set this type argument to `bool`.
-- The conditions must be a list of a type `T`, where either `T` or `*T` implements the `conditions.Condition[ConType]` interface.
-	- `ConType` is `v1alpha1.ConditionStatus` in this example.
-
+`v1alpha1.MyResource` is the resource type being reconciled in this example.
 
 ### How to use the status updater
 
@@ -132,28 +105,28 @@ It is recommended to move the actual reconciliation logic into a helper function
 
 First, initialize a new `StatusUpdaterBuilder`:
 ```go
-ctrlutils.NewStatusUpdaterBuilder[*v1alpha1.MyResource, v1alpha1.MyResourcePhase, v1alpha1.ConditionStatus]()
+ctrlutils.NewStatusUpdaterBuilder[*v1alpha1.MyResource]()
 ```
-It takes the type of the reconciled resource, the type of its `Phase` attribute and the type of the `Status` attribute of its conditions as type arguments.
+It takes the type of the reconciled resource as type argument.
 
 If you want to update the phase, you have to pass in a function that computes the new phase based on the the current state of the object and the returned reconcile result. Note that the function just has to return the phase, not to set it in the object. Failing to provide this function causes the updater to use a dummy implementation that sets the phase to the empty string.
 ```go
-WithPhaseUpdateFunc(func(obj *v1alpha1.MyResource, rr ctrlutils.ReconcileResult[*v1alpha1.MyResource, v1alpha1.ConditionStatus]) (v1alpha1.MyResourcePhase, error) {
+WithPhaseUpdateFunc(func(obj *v1alpha1.MyResource, rr ctrlutils.ReconcileResult[*v1alpha1.MyResource]) (v1alpha1.MyResourcePhase, error) {
 	if rr.ReconcileError != nil {
-		return v1alpha1.PROVIDER_CONFIG_PHASE_FAILED, nil
+		return v1alpha1.MY_PHASE_FAILED, nil
 	}
 	if len(rr.Conditions) > 0 {
 		for _, con := range rr.Conditions {
 			if con.GetStatus() != v1alpha1.CONDITION_TRUE {
-				return v1alpha1.PROVIDER_CONFIG_PHASE_FAILED, nil
+				return v1alpha1.MY_PHASE_FAILED, nil
 			}
 		}
 	}
-	return v1alpha1.PROVIDER_CONFIG_PHASE_SUCCEEDED, nil
+	return v1alpha1.MY_PHASE_SUCCEEDED, nil
 })
 ```
 
-If the conditions should be updated, the `WithConditionUpdater` method must be called. Similarly to the condition updater from the `conditions` package - which is used internally - it requires a constructor function that returns a new, empty instance of the controller-specific `conditions.Condition` implementation. The second argument specifies whether existing conditions that are not part of the updated conditions in the `ReconcileResult` should be removed or kept.
+If the conditions should be updated, the `WithConditionUpdater` method must be called. The argument specifies whether existing conditions that are not part of the updated conditions in the `ReconcileResult` should be removed or kept.
 
 You can then `Build()` the status updater and run `UpdateStatus()` to do the actual status update. The return values of this method are meant to be returned by the `Reconcile` function.
 
