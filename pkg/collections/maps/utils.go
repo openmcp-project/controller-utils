@@ -1,6 +1,11 @@
 package maps
 
-import "github.com/openmcp-project/controller-utils/pkg/collections/filters"
+import (
+	"k8s.io/utils/ptr"
+
+	"github.com/openmcp-project/controller-utils/pkg/collections/filters"
+	"github.com/openmcp-project/controller-utils/pkg/pairs"
+)
 
 // Filter filters a map by applying a filter function to each key-value pair.
 // Only the entries for which the filter function returns true are kept in the copy.
@@ -49,4 +54,13 @@ func Intersect[K comparable, V any](source map[K]V, maps ...map[K]V) map[K]V {
 	}
 
 	return res
+}
+
+// GetAny returns an arbitrary key-value pair from the map as a pointer to a pairs.Pair.
+// If the map is empty, it returns nil.
+func GetAny[K comparable, V any](m map[K]V) *pairs.Pair[K, V] {
+	for k, v := range m {
+		return ptr.To(pairs.New(k, v))
+	}
+	return nil
 }
