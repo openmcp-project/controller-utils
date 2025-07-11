@@ -2,7 +2,6 @@ package retry
 
 import (
 	"context"
-	"reflect"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -123,42 +122,24 @@ func (rc *Client) WithTimeout(timeout time.Duration) *Client {
 // CLIENT IMPLEMENTATION //
 ///////////////////////////
 
+type callbackFn func(ctx context.Context) error
+
 type operation struct {
 	parent    *Client
 	interval  time.Duration
 	attempts  int
 	startTime time.Time
-	method    reflect.Value
-	args      []reflect.Value
+	cfn       callbackFn
 }
 
-func (rc *Client) newOperation(method reflect.Value, args ...any) *operation {
-	op := &operation{
+func (rc *Client) newOperation(cfn callbackFn) *operation {
+	return &operation{
 		parent:    rc,
 		interval:  rc.interval,
 		attempts:  0,
 		startTime: time.Now(),
-		method:    method,
+		cfn:       cfn,
 	}
-	if method.Type().IsVariadic() {
-		argCountWithoutVariadic := len(args) - 1
-		last := args[argCountWithoutVariadic]
-		lastVal := reflect.ValueOf(last)
-		argCountVariadic := lastVal.Len()
-		op.args = make([]reflect.Value, argCountWithoutVariadic+argCountVariadic)
-		for i, arg := range args[:argCountWithoutVariadic] {
-			op.args[i] = reflect.ValueOf(arg)
-		}
-		for i := range argCountVariadic {
-			op.args[argCountWithoutVariadic+i] = lastVal.Index(i)
-		}
-	} else {
-		op.args = make([]reflect.Value, len(args))
-		for i, arg := range args {
-			op.args[i] = reflect.ValueOf(arg)
-		}
-	}
-	return op
 }
 
 // try attempts the operation.
@@ -169,20 +150,12 @@ func (rc *Client) newOperation(method reflect.Value, args ...any) *operation {
 //	This can be because the operation succeeded, or because the timeout or retry limit was reached.
 //
 // The third return value contains the return values of the operation.
-func (op *operation) try() (bool, time.Duration, []reflect.Value) {
-	res := op.method.Call(op.args)
-
-	// check for success by converting the last return value to an error
-	success := true
-	if len(res) > 0 {
-		if err, ok := res[len(res)-1].Interface().(error); ok && err != nil {
-			success = false
-		}
-	}
+func (op *operation) try(ctx context.Context) (bool, time.Duration) {
+	err := op.cfn(ctx)
 
 	// if the operation succeeded, return true and no retry
-	if success {
-		return true, 0, res
+	if err == nil {
+		return true, 0
 	}
 
 	// if the operation failed, check if we should retry
@@ -191,31 +164,22 @@ func (op *operation) try() (bool, time.Duration, []reflect.Value) {
 	op.interval = time.Duration(float64(op.interval) * op.parent.backoffMultiplier)
 	if (op.parent.maxAttempts > 0 && op.attempts >= op.parent.maxAttempts) || (op.parent.timeout > 0 && time.Now().Add(retryAfter).After(op.startTime.Add(op.parent.timeout))) {
 		// if we reached the maximum number of retries or the next retry would exceed the timeout, return false and no retry
-		return false, 0, res
+		return false, 0
 	}
 
-	return false, retryAfter, res
+	return false, retryAfter
 }
 
 // retry executes the given method with the provided arguments, retrying on failure.
-func (rc *Client) retry(method reflect.Value, args ...any) []reflect.Value {
-	op := rc.newOperation(method, args...)
-	var ctx context.Context
-	if len(args) > 0 {
-		if ctxArg, ok := args[0].(context.Context); ok {
-			ctx = ctxArg
-		}
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
+func (rc *Client) retry(ctx context.Context, cfn callbackFn) {
+	op := rc.newOperation(cfn)
 	if rc.Timeout() > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithDeadline(ctx, op.startTime.Add(rc.timeout))
 		defer cancel()
 	}
 	interruptedOrTimeouted := ctx.Done()
-	success, retryAfter, res := op.try()
+	success, retryAfter := op.try(ctx)
 	for !success && retryAfter > 0 {
 		opCtx, opCancel := context.WithTimeout(ctx, retryAfter)
 		expired := opCtx.Done()
@@ -223,84 +187,109 @@ func (rc *Client) retry(method reflect.Value, args ...any) []reflect.Value {
 		case <-interruptedOrTimeouted:
 			retryAfter = 0 // stop retrying if the context was cancelled
 		case <-expired:
-			success, retryAfter, res = op.try()
+			success, retryAfter = op.try(ctx)
 		}
 		opCancel()
 	}
-	return res
-}
-
-func errOrNil(val reflect.Value) error {
-	if val.IsNil() {
-		return nil
-	}
-	return val.Interface().(error)
 }
 
 // CreateOrUpdate wraps the controllerutil.CreateOrUpdate function and retries it on failure.
-func (rc *Client) CreateOrUpdate(ctx context.Context, obj client.Object, f controllerutil.MutateFn) (controllerutil.OperationResult, error) {
-	res := rc.retry(reflect.ValueOf(controllerutil.CreateOrUpdate), ctx, rc.internal, obj, f)
-	return res[0].Interface().(controllerutil.OperationResult), errOrNil(res[1])
+func (rc *Client) CreateOrUpdate(ctx context.Context, obj client.Object, f controllerutil.MutateFn) (res controllerutil.OperationResult, err error) {
+	rc.retry(ctx, func(ctx context.Context) error {
+		res, err = controllerutil.CreateOrUpdate(ctx, rc.internal, obj, f)
+		return err
+	})
+	return
 }
 
 // CreateOrPatch wraps the controllerutil.CreateOrPatch function and retries it on failure.
-func (rc *Client) CreateOrPatch(ctx context.Context, obj client.Object, f controllerutil.MutateFn) (controllerutil.OperationResult, error) {
-	res := rc.retry(reflect.ValueOf(controllerutil.CreateOrPatch), ctx, rc.internal, obj, f)
-	return res[0].Interface().(controllerutil.OperationResult), errOrNil(res[1])
+func (rc *Client) CreateOrPatch(ctx context.Context, obj client.Object, f controllerutil.MutateFn) (res controllerutil.OperationResult, err error) {
+	rc.retry(ctx, func(ctx context.Context) error {
+		res, err = controllerutil.CreateOrPatch(ctx, rc.internal, obj, f)
+		return err
+	})
+	return
 }
 
 // Create wraps the client's Create method and retries it on failure.
-func (rc *Client) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) error {
-	res := rc.retry(reflect.ValueOf(rc.internal.Create), ctx, obj, opts)
-	return errOrNil(res[0])
+func (rc *Client) Create(ctx context.Context, obj client.Object, opts ...client.CreateOption) (err error) {
+	rc.retry(ctx, func(ctx context.Context) error {
+		err = rc.internal.Create(ctx, obj, opts...)
+		return err
+	})
+	return
 }
 
 // Delete wraps the client's Delete method and retries it on failure.
-func (rc *Client) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
-	res := rc.retry(reflect.ValueOf(rc.internal.Delete), ctx, obj, opts)
-	return errOrNil(res[0])
+func (rc *Client) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) (err error) {
+	rc.retry(ctx, func(ctx context.Context) error {
+		err = rc.internal.Delete(ctx, obj, opts...)
+		return err
+	})
+	return
 }
 
 // DeleteAllOf wraps the client's DeleteAllOf method and retries it on failure.
-func (rc *Client) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
-	res := rc.retry(reflect.ValueOf(rc.internal.DeleteAllOf), ctx, obj, opts)
-	return errOrNil(res[0])
+func (rc *Client) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) (err error) {
+	rc.retry(ctx, func(ctx context.Context) error {
+		err = rc.internal.DeleteAllOf(ctx, obj, opts...)
+		return err
+	})
+	return
 }
 
 // Get wraps the client's Get method and retries it on failure.
-func (rc *Client) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-	res := rc.retry(reflect.ValueOf(rc.internal.Get), ctx, key, obj, opts)
-	return errOrNil(res[0])
+func (rc *Client) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) (err error) {
+	rc.retry(ctx, func(ctx context.Context) error {
+		err = rc.internal.Get(ctx, key, obj, opts...)
+		return err
+	})
+	return
 }
 
 // List wraps the client's List method and retries it on failure.
-func (rc *Client) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
-	res := rc.retry(reflect.ValueOf(rc.internal.List), ctx, list, opts)
-	return errOrNil(res[0])
+func (rc *Client) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) (err error) {
+	rc.retry(ctx, func(ctx context.Context) error {
+		err = rc.internal.List(ctx, list, opts...)
+		return err
+	})
+	return
 }
 
 // Patch wraps the client's Patch method and retries it on failure.
-func (rc *Client) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-	res := rc.retry(reflect.ValueOf(rc.internal.Patch), ctx, obj, patch, opts)
-	return errOrNil(res[0])
+func (rc *Client) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) (err error) {
+	rc.retry(ctx, func(ctx context.Context) error {
+		err = rc.internal.Patch(ctx, obj, patch, opts...)
+		return err
+	})
+	return
 }
 
 // Update wraps the client's Update method and retries it on failure.
-func (rc *Client) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-	res := rc.retry(reflect.ValueOf(rc.internal.Update), ctx, obj, opts)
-	return errOrNil(res[0])
+func (rc *Client) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) (err error) {
+	rc.retry(ctx, func(ctx context.Context) error {
+		err = rc.internal.Update(ctx, obj, opts...)
+		return err
+	})
+	return
 }
 
 // GroupVersionKindFor wraps the client's GroupVersionKindFor method and retries it on failure.
-func (rc *Client) GroupVersionKindFor(obj runtime.Object) (schema.GroupVersionKind, error) {
-	res := rc.retry(reflect.ValueOf(rc.internal.GroupVersionKindFor), obj)
-	return res[0].Interface().(schema.GroupVersionKind), errOrNil(res[1])
+func (rc *Client) GroupVersionKindFor(obj runtime.Object) (gvk schema.GroupVersionKind, err error) {
+	rc.retry(context.Background(), func(ctx context.Context) error {
+		gvk, err = rc.internal.GroupVersionKindFor(obj)
+		return err
+	})
+	return
 }
 
 // IsObjectNamespaced wraps the client's IsObjectNamespaced method and retries it on failure.
-func (rc *Client) IsObjectNamespaced(obj runtime.Object) (bool, error) {
-	res := rc.retry(reflect.ValueOf(rc.internal.IsObjectNamespaced), obj)
-	return res[0].Interface().(bool), errOrNil(res[1])
+func (rc *Client) IsObjectNamespaced(obj runtime.Object) (namespaced bool, err error) {
+	rc.retry(context.Background(), func(ctx context.Context) error {
+		namespaced, err = rc.internal.IsObjectNamespaced(obj)
+		return err
+	})
+	return
 }
 
 // RESTMapper calls the internal client's RESTMapper method.
