@@ -14,6 +14,7 @@
 - [Key-Value Pairs](libs/pairs.md)
 - [Readiness Checks](libs/readiness.md)
 - [Kubernetes Resource Management](libs/resource.md)
+- [Retrying k8s Operations](libs/retry.md)
 - [Kubernetes Resource Status Updating](libs/status.md)
 - [Testing](libs/testing.md)
 - [Thread Management](libs/threads.md)
