@@ -7,7 +7,7 @@ import (
 	"github.com/openmcp-project/controller-utils/pkg/collections/maps"
 )
 
-var _ = Describe("LinkedIterator Tests", func() {
+var _ = Describe("Map Utils Tests", func() {
 
 	Context("Merge", func() {
 
@@ -56,6 +56,24 @@ var _ = Describe("LinkedIterator Tests", func() {
 
 			intersected = maps.Intersect(map[string]string{}, map[string]string{"foo": "bar"})
 			Expect(intersected).To(BeEmpty())
+		})
+
+	})
+
+	Context("GetAny", func() {
+
+		It("should return a key-value pair from the map", func() {
+			m1 := map[string]string{"foo": "bar", "bar": "baz", "foobar": "foobaz"}
+			pair := maps.GetAny(m1)
+			Expect(pair).ToNot(BeNil())
+			Expect(pair.Key).To(BeElementOf("foo", "bar", "foobar"))
+			Expect(m1[pair.Key]).To(Equal(pair.Value))
+		})
+
+		It("should return nil for an empty or nil map", func() {
+			var nilMap map[string]string
+			Expect(maps.GetAny(nilMap)).To(BeNil())
+			Expect(maps.GetAny(map[string]string{})).To(BeNil())
 		})
 
 	})
