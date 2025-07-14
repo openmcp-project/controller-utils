@@ -66,6 +66,7 @@ func AggregateSlice[X any, Y any](src []X, agg func(X, Y) Y, initial Y) Y {
 // It applies the aggregation function to each key-value pair in the map, also passing in the current result.
 // For the first key-value pair, it uses the initial value as the current result.
 // Returns initial if the aggregation function is nil.
+// Note that the iteration order over the map elements is undefined and may vary between executions.
 func AggregateMap[K comparable, V any, R any](src map[K]V, agg func(K, V, R) R, initial R) R {
 	if agg == nil {
 		return initial

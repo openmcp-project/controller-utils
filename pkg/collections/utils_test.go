@@ -1,10 +1,13 @@
 package collections_test
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/openmcp-project/controller-utils/pkg/collections"
+	"github.com/openmcp-project/controller-utils/pkg/pairs"
 )
 
 var _ = Describe("Utils Tests", func() {
@@ -86,6 +89,72 @@ var _ = Describe("Utils Tests", func() {
 			projected := collections.ProjectMapToMap[string, string, string, int](src, nil)
 			Expect(projected).To(BeNil())
 			Expect(src).To(Equal(map[string]string{"a": "1", "b": "22", "c": "333"}), "original map should not be modified")
+		})
+
+	})
+
+	Context("AggregateSlice", func() {
+
+		sum := func(val, s int) int {
+			return val + s
+		}
+		stradd := func(val int, s string) string {
+			return fmt.Sprintf("%s%d", s, val)
+		}
+
+		It("should return the initial value if the aggregation function is nil", func() {
+			src := []int{1, 2, 3, 4}
+			result := collections.AggregateSlice(src, nil, 0)
+			Expect(result).To(Equal(0))
+			Expect(src).To(Equal([]int{1, 2, 3, 4}))
+		})
+
+		It("should correctly aggregate the slice using the provided function", func() {
+			src := []int{1, 2, 3, 4}
+			result := collections.AggregateSlice(src, sum, 0)
+			Expect(result).To(Equal(10))
+			Expect(src).To(Equal([]int{1, 2, 3, 4}))
+
+			result2 := collections.AggregateSlice(src, stradd, "test")
+			Expect(result2).To(Equal("test1234"))
+			Expect(src).To(Equal([]int{1, 2, 3, 4}))
+		})
+
+		It("should handle a nil input slice", func() {
+			result := collections.AggregateSlice[int, int](nil, sum, 100)
+			Expect(result).To(Equal(100))
+		})
+
+	})
+
+	Context("AggregateMap", func() {
+
+		aggregate := func(k string, v int, agg pairs.Pair[string, int]) pairs.Pair[string, int] {
+			return pairs.New(agg.Key+k, agg.Value+v)
+		}
+
+		It("should return the initial value if the aggregation function is nil", func() {
+			src := map[string]int{"a": 1, "b": 2, "c": 3}
+			result := collections.AggregateMap(src, nil, 0)
+			Expect(result).To(Equal(0))
+			Expect(src).To(Equal(map[string]int{"a": 1, "b": 2, "c": 3}))
+		})
+
+		It("should correctly aggregate the map using the provided function", func() {
+			src := map[string]int{"a": 1, "b": 2, "c": 3}
+			result := collections.AggregateMap(src, aggregate, pairs.New("", 0))
+			Expect(result.Key).To(HaveLen(3))
+			Expect(result.Key).To(ContainSubstring("a"))
+			Expect(result.Key).To(ContainSubstring("b"))
+			Expect(result.Key).To(ContainSubstring("c"))
+			Expect(result.Value).To(Equal(6))
+			Expect(src).To(Equal(map[string]int{"a": 1, "b": 2, "c": 3}))
+		})
+
+		It("should handle a nil input map", func() {
+			result := collections.AggregateMap(nil, aggregate, pairs.New("", 0))
+			Expect(result.Key).To(BeEmpty())
+			Expect(result.Value).To(Equal(0))
 		})
 
 	})
