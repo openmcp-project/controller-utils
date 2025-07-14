@@ -8,14 +8,18 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/types"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/openmcp-project/controller-utils/pkg/logging"
+	"github.com/openmcp-project/controller-utils/pkg/testing/matchers"
 )
 
 /////////////////
@@ -30,6 +34,8 @@ func DefaultScheme() *runtime.Scheme {
 	}
 	return sc
 }
+
+var noMatcher types.GomegaMatcher = nil
 
 ///////////////////////////
 /// COMPLEX ENVIRONMENT ///
@@ -82,27 +88,37 @@ func (e *ComplexEnvironment) shouldEventuallyReconcile(reconciler string, req re
 
 // ShouldNotReconcile calls the given reconciler with the given request and expects an error.
 func (e *ComplexEnvironment) ShouldNotReconcile(reconciler string, req reconcile.Request, optionalDescription ...interface{}) reconcile.Result {
-	return e.shouldNotReconcile(reconciler, req, optionalDescription...)
+	return e.shouldNotReconcile(reconciler, req, noMatcher, optionalDescription...)
 }
 
-func (e *ComplexEnvironment) shouldNotReconcile(reconciler string, req reconcile.Request, optionalDescription ...interface{}) reconcile.Result {
+// ShouldNotReconcileWithError calls the given reconciler with the given request and expects an error that matches the given matcher.
+func (e *ComplexEnvironment) ShouldNotReconcileWithError(reconciler string, req reconcile.Request, matcher types.GomegaMatcher, optionalDescription ...interface{}) reconcile.Result {
+	return e.shouldNotReconcile(reconciler, req, matcher, optionalDescription...)
+}
+
+func (e *ComplexEnvironment) shouldNotReconcile(reconciler string, req reconcile.Request, matcher types.GomegaMatcher, optionalDescription ...interface{}) reconcile.Result {
 	res, err := e.Reconcilers[reconciler].Reconcile(e.Ctx, req)
-	gomega.ExpectWithOffset(2, err).To(gomega.HaveOccurred(), optionalDescription...)
+	gomega.ExpectWithOffset(2, err).To(gomega.And(gomega.HaveOccurred(), matchers.MaybeMatch(matcher)), optionalDescription...)
 	return res
 }
 
 // ShouldEventuallyNotReconcile calls the given reconciler with the given request and retries until an error occurred or the timeout is reached.
 func (e *ComplexEnvironment) ShouldEventuallyNotReconcile(reconciler string, req reconcile.Request, timeout, poll time.Duration, optionalDescription ...interface{}) reconcile.Result {
-	return e.shouldEventuallyNotReconcile(reconciler, req, timeout, poll, optionalDescription...)
+	return e.shouldEventuallyNotReconcile(reconciler, req, noMatcher, timeout, poll, optionalDescription...)
 }
 
-func (e *ComplexEnvironment) shouldEventuallyNotReconcile(reconciler string, req reconcile.Request, timeout, poll time.Duration, optionalDescription ...interface{}) reconcile.Result {
+// ShouldEventuallyNotReconcileWithError calls the given reconciler with the given request and retries until an error that matches the given matcher occurred or the timeout is reached.
+func (e *ComplexEnvironment) ShouldEventuallyNotReconcileWithError(reconciler string, req reconcile.Request, matcher types.GomegaMatcher, timeout, poll time.Duration, optionalDescription ...interface{}) reconcile.Result {
+	return e.shouldEventuallyNotReconcile(reconciler, req, matcher, timeout, poll, optionalDescription...)
+}
+
+func (e *ComplexEnvironment) shouldEventuallyNotReconcile(reconciler string, req reconcile.Request, matcher types.GomegaMatcher, timeout, poll time.Duration, optionalDescription ...interface{}) reconcile.Result {
 	var err error
 	var res reconcile.Result
 	gomega.EventuallyWithOffset(1, func() error {
 		res, err = e.Reconcilers[reconciler].Reconcile(e.Ctx, req)
 		return err
-	}, timeout, poll).ShouldNot(gomega.Succeed(), optionalDescription...)
+	}, timeout, poll).ShouldNot(gomega.And(gomega.Succeed(), matchers.MaybeMatch(matcher)), optionalDescription...)
 	return res
 }
 
@@ -121,6 +137,7 @@ type ComplexEnvironmentBuilder struct {
 	ClusterInitObjectPaths  map[string][]string
 	ClientCreationCallbacks map[string][]func(client.Client)
 	loggerIsSet             bool
+	InjectUIDs              map[string]bool
 }
 
 type ClusterEnvironment struct {
@@ -163,6 +180,7 @@ func NewComplexEnvironmentBuilder() *ComplexEnvironmentBuilder {
 		ClusterStatusObjects:    map[string][]client.Object{},
 		ClusterInitObjectPaths:  map[string][]string{},
 		ClientCreationCallbacks: map[string][]func(client.Client){},
+		InjectUIDs:              map[string]bool{},
 	}
 }
 
@@ -264,6 +282,16 @@ func (eb *ComplexEnvironmentBuilder) WithAfterClientCreationCallback(name string
 	return eb
 }
 
+// WithUIDs enables UID injection for the specified cluster.
+// All objects that are initially loaded or afterwards created via the client's 'Create' method will have a random UID injected, if they do not already have one.
+// Note that this function registers an interceptor function, which will be overwritten if 'WithFakeClientBuilderCall(..., "WithInterceptorFuncs", ...)' is also called.
+// This would lead to newly created objects not having a UID injected.
+// To avoid this, pass 'InjectUIDOnObjectCreation(...)' into the interceptor.Funcs' Create field. The argument allows to inject your own additional Create logic, if desired.
+func (eb *ComplexEnvironmentBuilder) WithUIDs(name string) *ComplexEnvironmentBuilder {
+	eb.InjectUIDs[name] = true
+	return eb
+}
+
 // WithFakeClientBuilderCall allows to inject method calls to fake.ClientBuilder when the fake clients are created during Build().
 // The fake clients are usually created using WithScheme(...).WithObjects(...).WithStatusSubresource(...).Build().
 // This function allows to inject additional method calls. It is only required for advanced use-cases.
@@ -284,6 +312,8 @@ func (eb *ComplexEnvironmentBuilder) WithFakeClientBuilderCall(name string, meth
 // Build constructs the environment from the builder.
 // Note that this function panics instead of throwing an error,
 // as it is intended to be used in tests, where all information is static anyway.
+//
+//nolint:gocyclo
 func (eb *ComplexEnvironmentBuilder) Build() *ComplexEnvironment {
 	res := eb.internal
 
@@ -334,6 +364,18 @@ func (eb *ComplexEnvironmentBuilder) Build() *ComplexEnvironment {
 			}
 			if len(eb.ClusterInitObjects) > 0 {
 				objs = append(objs, eb.ClusterInitObjects[name]...)
+			}
+			if eb.InjectUIDs[name] {
+				// ensure that objects have a uid
+				for _, obj := range objs {
+					if obj.GetUID() == "" {
+						// set a random UID if not already set
+						obj.SetUID(uuid.NewUUID())
+					}
+				}
+				fcb.WithInterceptorFuncs(interceptor.Funcs{
+					Create: InjectUIDOnObjectCreation(nil),
+				})
 			}
 			statusObjs := []client.Object{}
 			statusObjs = append(statusObjs, objs...)
@@ -395,4 +437,20 @@ func (eb *ComplexEnvironmentBuilder) Build() *ComplexEnvironment {
 	}
 
 	return res
+}
+
+// InjectUIDOnObjectCreation returns an interceptor function for Create which injects a random UID into the object, if it does not already have one.
+// If additionalLogic is nil, the object is created regularly afterwards.
+// Otherwise, additionalLogic is called.
+// If you called 'WithUIDs(...)' on the ComplexEnvironmentBuilder AND 'WithFakeClientBuilderCall(..., "WithInterceptorFuncs", ...)', then you need to pass this function into the interceptor.Funcs' Create field, optionally adding your own creation logic via additionalLogic.
+func InjectUIDOnObjectCreation(additionalLogic func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error) func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+	return func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+		if obj.GetUID() == "" {
+			obj.SetUID(uuid.NewUUID())
+		}
+		if additionalLogic != nil {
+			return additionalLogic(ctx, client, obj, opts...)
+		}
+		return client.Create(ctx, obj, opts...)
+	}
 }
