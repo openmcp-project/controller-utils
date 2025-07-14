@@ -2,49 +2,60 @@ package controller
 
 import (
 	"fmt"
-	"testing"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/openmcp-project/controller-utils/pkg/pairs"
 
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
-func TestK8sNameHash(t *testing.T) {
-	tt := []struct {
-		input   []string
-		expHash string
-	}{
-		{
-			[]string{"test1"},
-			"dnhq5gcrs4mzrzzsa6cujsllg3b5ahhn67fkgmrvtvxr3a2woaka",
-		},
-		{
-			// check that the same string produces the same hash
-			[]string{"test1"},
-			"dnhq5gcrs4mzrzzsa6cujsllg3b5ahhn67fkgmrvtvxr3a2woaka",
-		},
-		{
-			[]string{"bla"},
-			"jxz4h5upzsb3e7u5ileqimnhesm7c6dvzanftg2wnsmitoljm4bq",
-		},
-		{
-			[]string{"some other test", "this is a very, very long string"},
-			"rjphpfjbmwn6qqydv6xhtmj3kxrlzepn2tpwy4okw2ypoc3nlffq",
-		},
-	}
+var _ = Describe("Predicates", func() {
 
-	for _, tc := range tt {
-		t.Run(fmt.Sprint(tc.input), func(t *testing.T) {
-			res := K8sNameHash(tc.input...)
+	Context("K8sNameHash", func() {
 
-			if res != tc.expHash {
-				t.Errorf("exp hash %q, got %q", tc.expHash, res)
+		testData := []pairs.Pair[*[]string, string]{
+			{
+				Key:   &[]string{"test1"},
+				Value: "dnhq5gcrs4mzrzzsa6cujsllg3b5ahhn67fkgmrvtvxr3a2woaka",
+			},
+			{
+				Key:   &[]string{"bla"},
+				Value: "jxz4h5upzsb3e7u5ileqimnhesm7c6dvzanftg2wnsmitoljm4bq",
+			},
+			{
+				Key:   &[]string{"some other test", "this is a very, very long string"},
+				Value: "rjphpfjbmwn6qqydv6xhtmj3kxrlzepn2tpwy4okw2ypoc3nlffq",
+			},
+		}
+
+		It("should generate the same hash for the same input value", func() {
+			for _, p := range testData {
+				for range 5 {
+					res := K8sNameHash(*p.Key...)
+					Expect(res).To(Equal(p.Value))
+				}
 			}
-
-			// ensure the result is a valid DNS1123Subdomain
-			if errs := validation.IsDNS1123Subdomain(res); errs != nil {
-				t.Errorf("value %q is invalid: %v", res, errs)
-			}
-
 		})
-	}
 
-}
+		It("should generate different hashes for different input values", func() {
+			res1 := K8sNameHash(*testData[0].Key...)
+			res2 := K8sNameHash(*testData[1].Key...)
+			res3 := K8sNameHash(*testData[2].Key...)
+			Expect(res1).NotTo(Equal(res2))
+			Expect(res1).NotTo(Equal(res3))
+			Expect(res2).NotTo(Equal(res3))
+		})
+
+		It("should generate a valid DNS1123Subdomain", func() {
+			for _, p := range testData {
+				res := K8sNameHash(*p.Key...)
+				errs := validation.IsDNS1123Subdomain(res)
+				Expect(errs).To(BeEmpty(), fmt.Sprintf("value %q is invalid: %v", res, errs))
+			}
+		})
+
+	})
+
+})
