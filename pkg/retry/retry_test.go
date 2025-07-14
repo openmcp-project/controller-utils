@@ -305,6 +305,31 @@ var _ = Describe("Client", func() {
 		Expect(mc.attempts).To(BeNumerically("<=", 3))
 	})
 
+	It("should handle WithContext correctly", func() {
+		env, mc := defaultTestSetup()
+		c := retry.NewRetryingClient(env.Client()).WithMaxAttempts(0).WithTimeout(500 * time.Millisecond)
+
+		type dummy struct {
+			corev1.Namespace
+		}
+
+		mc.reset(-1)
+		now := time.Now()
+		timeoutCtx, cancel := context.WithTimeout(env.Ctx, 200*time.Millisecond)
+		defer cancel()
+		_, err := c.WithContext(timeoutCtx).GroupVersionKindFor(&dummy{})
+		Expect(err).To(HaveOccurred())
+		after := time.Now()
+		Expect(after.Sub(now)).To(BeNumerically("<", 300*time.Millisecond))
+
+		// should not use the same context again, it should have been reset
+		now = time.Now()
+		_, err = c.GroupVersionKindFor(&dummy{})
+		Expect(err).To(HaveOccurred())
+		after = time.Now()
+		Expect(after.Sub(now)).To(BeNumerically(">", 300*time.Millisecond))
+	})
+
 	It("should pass the arguments through correctly", func() {
 		env, mc := defaultTestSetup()
 		c := retry.NewRetryingClient(env.Client())

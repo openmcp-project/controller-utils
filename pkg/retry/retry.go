@@ -17,6 +17,7 @@ type Client struct {
 	backoffMultiplier float64
 	maxAttempts       int
 	timeout           time.Duration
+	context           context.Context
 }
 
 // NewRetryingClient returns a retry.Client that implements client.Client, but retries each operation that can fail with the specified parameters.
@@ -37,6 +38,7 @@ func NewRetryingClient(c client.Client) *Client {
 		backoffMultiplier: 1.0,                    // default backoff multiplier
 		maxAttempts:       0,                      // default max retries
 		timeout:           1 * time.Second,        // default timeout for retries
+		context:           context.Background(),   // default context
 	}
 }
 
@@ -118,6 +120,25 @@ func (rc *Client) WithTimeout(timeout time.Duration) *Client {
 	return rc
 }
 
+// WithContext sets the context for the next call of either GroupVersionKindFor or IsObjectNamespaced.
+// Since the signature of these methods does not allow passing a context, and the retrying can not be cancelled without one,
+// this method is required to inject the context to be used for the aforementioned methods.
+// Note that any function of this Client that actually retries an operation will reset this context, but only for GroupVersionKindFor and IsObjectNamespaced it will actually be used.
+// The intended use of this method is something like this:
+//
+//	c.WithContext(ctx).GroupVersionKindFor(obj)
+//	c.WithContext(ctx).IsObjectNamespaced(obj)
+//
+// If no context is injected via this method, both GroupVersionKindFor and IsObjectNamespaced will use the default context.Background().
+// It returns the Client for chaining.
+func (rc *Client) WithContext(ctx context.Context) *Client {
+	if ctx == nil {
+		ctx = context.Background() // default to background context if nil
+	}
+	rc.context = ctx
+	return rc
+}
+
 ///////////////////////////
 // CLIENT IMPLEMENTATION //
 ///////////////////////////
@@ -172,6 +193,7 @@ func (op *operation) try(ctx context.Context) (bool, time.Duration) {
 
 // retry executes the given method with the provided arguments, retrying on failure.
 func (rc *Client) retry(ctx context.Context, cfn callbackFn) {
+	rc.WithContext(context.Background()) // reset context
 	op := rc.newOperation(cfn)
 	if rc.Timeout() > 0 {
 		var cancel context.CancelFunc
@@ -276,7 +298,7 @@ func (rc *Client) Update(ctx context.Context, obj client.Object, opts ...client.
 
 // GroupVersionKindFor wraps the client's GroupVersionKindFor method and retries it on failure.
 func (rc *Client) GroupVersionKindFor(obj runtime.Object) (gvk schema.GroupVersionKind, err error) {
-	rc.retry(context.Background(), func(ctx context.Context) error {
+	rc.retry(rc.context, func(ctx context.Context) error {
 		gvk, err = rc.internal.GroupVersionKindFor(obj)
 		return err
 	})
@@ -285,7 +307,7 @@ func (rc *Client) GroupVersionKindFor(obj runtime.Object) (gvk schema.GroupVersi
 
 // IsObjectNamespaced wraps the client's IsObjectNamespaced method and retries it on failure.
 func (rc *Client) IsObjectNamespaced(obj runtime.Object) (namespaced bool, err error) {
-	rc.retry(context.Background(), func(ctx context.Context) error {
+	rc.retry(rc.context, func(ctx context.Context) error {
 		namespaced, err = rc.internal.IsObjectNamespaced(obj)
 		return err
 	})
