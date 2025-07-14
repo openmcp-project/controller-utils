@@ -9,8 +9,8 @@ func ProjectSlice[X any, Y any](src []X, project func(X) Y) []Y {
 		return nil
 	}
 	res := make([]Y, len(src))
-	for i, src := range src {
-		res[i] = project(src)
+	for i, x := range src {
+		res[i] = project(x)
 	}
 	return res
 }
