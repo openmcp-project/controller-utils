@@ -35,6 +35,8 @@ func DefaultScheme() *runtime.Scheme {
 	return sc
 }
 
+var noMatcher types.GomegaMatcher = nil
+
 ///////////////////////////
 /// COMPLEX ENVIRONMENT ///
 ///////////////////////////
@@ -86,7 +88,7 @@ func (e *ComplexEnvironment) shouldEventuallyReconcile(reconciler string, req re
 
 // ShouldNotReconcile calls the given reconciler with the given request and expects an error.
 func (e *ComplexEnvironment) ShouldNotReconcile(reconciler string, req reconcile.Request, optionalDescription ...interface{}) reconcile.Result {
-	return e.shouldNotReconcile(reconciler, req, nil, optionalDescription...)
+	return e.shouldNotReconcile(reconciler, req, noMatcher, optionalDescription...)
 }
 
 // ShouldNotReconcileWithError calls the given reconciler with the given request and expects an error that matches the given matcher.
@@ -102,7 +104,7 @@ func (e *ComplexEnvironment) shouldNotReconcile(reconciler string, req reconcile
 
 // ShouldEventuallyNotReconcile calls the given reconciler with the given request and retries until an error occurred or the timeout is reached.
 func (e *ComplexEnvironment) ShouldEventuallyNotReconcile(reconciler string, req reconcile.Request, timeout, poll time.Duration, optionalDescription ...interface{}) reconcile.Result {
-	return e.shouldEventuallyNotReconcile(reconciler, req, nil, timeout, poll, optionalDescription...)
+	return e.shouldEventuallyNotReconcile(reconciler, req, noMatcher, timeout, poll, optionalDescription...)
 }
 
 // ShouldEventuallyNotReconcileWithError calls the given reconciler with the given request and retries until an error that matches the given matcher occurred or the timeout is reached.
