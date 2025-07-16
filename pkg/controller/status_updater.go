@@ -10,6 +10,7 @@ import (
 	"github.com/openmcp-project/controller-utils/pkg/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -90,6 +91,15 @@ func (b *StatusUpdaterBuilder[Obj]) WithConditionUpdater(removeUntouchedConditio
 	return b
 }
 
+// WithConditionEvents sets the event recorder and the verbosity that is used for recording events for changed conditions.
+// If the event recorder is nil, no events are recorded.
+// Note that this has no effect if condition updates are enabled, see WithConditionUpdater().
+func (b *StatusUpdaterBuilder[Obj]) WithConditionEvents(eventRecorder record.EventRecorder, verbosity conditions.EventVerbosity) *StatusUpdaterBuilder[Obj] {
+	b.internal.eventRecorder = eventRecorder
+	b.internal.eventVerbosity = verbosity
+	return b
+}
+
 // WithPhaseUpdateFunc sets the function that determines the phase of the object.
 // It is strongly recommended to either disable the phase field or override this function, because the default will simply set the Phase to an empty string.
 // The function is called with a deep copy of the object, after all other status updates have been applied (except for the custom update).
@@ -146,6 +156,8 @@ type statusUpdater[Obj client.Object] struct {
 	phaseUpdateFunc           func(obj Obj, rr ReconcileResult[Obj]) (string, error)
 	customUpdateFunc          func(obj Obj, rr ReconcileResult[Obj]) error
 	removeUntouchedConditions bool
+	eventRecorder             record.EventRecorder
+	eventVerbosity            conditions.EventVerbosity
 }
 
 func newStatusUpdater[Obj client.Object]() *statusUpdater[Obj] {
@@ -214,11 +226,14 @@ func (s *statusUpdater[Obj]) UpdateStatus(ctx context.Context, c client.Client, 
 	if s.fieldNames[STATUS_FIELD_CONDITIONS] != "" {
 		oldCons := GetField(status, s.fieldNames[STATUS_FIELD_CONDITIONS], false).([]metav1.Condition)
 		cu := conditions.ConditionUpdater(oldCons, s.removeUntouchedConditions)
+		if s.eventRecorder != nil {
+			cu.WithEventRecorder(s.eventRecorder, s.eventVerbosity)
+		}
 		cu.Now = now
 		for _, con := range rr.Conditions {
 			cu.UpdateConditionFromTemplate(con)
 		}
-		newCons, _ := cu.Conditions()
+		newCons, _ := cu.Record(rr.Object).Conditions()
 		SetField(status, s.fieldNames[STATUS_FIELD_CONDITIONS], newCons)
 	}
 	if s.fieldNames[STATUS_FIELD_PHASE] != "" {
