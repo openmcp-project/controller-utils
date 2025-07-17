@@ -11,6 +11,8 @@ import (
 	. "github.com/openmcp-project/controller-utils/pkg/testing/matchers"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 
 	"github.com/openmcp-project/controller-utils/pkg/conditions"
 )
@@ -213,4 +215,205 @@ var _ = Describe("Conditions", func() {
 
 	})
 
+	Context("EventRecorder", func() {
+
+		var recorder *record.FakeRecorder
+
+		dummy := &dummyObject{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Dummy",
+				APIVersion: "dummy/v1",
+			},
+		}
+
+		BeforeEach(func() {
+			recorder = record.NewFakeRecorder(100)
+		})
+
+		AfterEach(func() {
+			close(recorder.Events)
+		})
+
+		Context("Verbosity: EventPerChange", func() {
+
+			It("should record an event for each changed condition status", func() {
+				cons := testConditionSet()
+				updater := conditions.ConditionUpdater(cons, false).WithEventRecorder(recorder, conditions.EventPerChange)
+				trueCon1 := conditions.GetCondition(cons, "true")
+				trueCon2 := conditions.GetCondition(cons, "alsoTrue")
+				_, changed := updater.
+					UpdateCondition(trueCon1.Type, invert(trueCon1.Status), trueCon1.ObservedGeneration+1, "newReason", "newMessage").
+					UpdateCondition(trueCon2.Type, invert(trueCon2.Status), trueCon2.ObservedGeneration+1, "newReason", "newMessage").
+					Record(dummy).Conditions()
+				Expect(changed).To(BeTrue())
+
+				events := flush(recorder.Events)
+				Expect(events).To(ConsistOf(
+					ContainSubstring("Condition '%s' changed from '%s' to '%s'", trueCon1.Type, trueCon1.Status, invert(trueCon1.Status)),
+					ContainSubstring("Condition '%s' changed from '%s' to '%s'", trueCon2.Type, trueCon2.Status, invert(trueCon2.Status)),
+				))
+			})
+
+			It("should not record any events if no condition status changed, even if other fields changed", func() {
+				cons := testConditionSet()
+				updater := conditions.ConditionUpdater(cons, false).WithEventRecorder(recorder, conditions.EventPerChange)
+				trueCon1 := conditions.GetCondition(cons, "true")
+				trueCon2 := conditions.GetCondition(cons, "alsoTrue")
+				_, changed := updater.
+					UpdateCondition(trueCon1.Type, trueCon1.Status, trueCon1.ObservedGeneration+1, "newReason", "newMessage").
+					UpdateCondition(trueCon2.Type, trueCon2.Status, trueCon2.ObservedGeneration+1, "newReason", "newMessage").
+					Record(dummy).Conditions()
+				Expect(changed).To(BeTrue())
+
+				events := flush(recorder.Events)
+				Expect(events).To(BeEmpty())
+			})
+
+			It("should record added and lost conditions", func() {
+				cons := testConditionSet()
+				updater := conditions.ConditionUpdater(cons, false).WithEventRecorder(recorder, conditions.EventPerChange)
+				_, changed := updater.
+					UpdateCondition("new", metav1.ConditionUnknown, 1, "newReason", "newMessage").
+					RemoveCondition("true").
+					Record(dummy).Conditions()
+				Expect(changed).To(BeTrue())
+
+				events := flush(recorder.Events)
+				Expect(events).To(ConsistOf(
+					ContainSubstring("Condition 'new' added with status '%s'", metav1.ConditionUnknown),
+					ContainSubstring("Condition 'true' with status '%s' removed", metav1.ConditionTrue),
+				))
+			})
+
+		})
+
+		Context("Verbosity: EventPerNewStatus", func() {
+
+			It("should record an event for each new status that any condition has reached", func() {
+				cons := testConditionSet()
+				updater := conditions.ConditionUpdater(cons, false).WithEventRecorder(recorder, conditions.EventPerNewStatus)
+				trueCon1 := conditions.GetCondition(cons, "true")
+				trueCon2 := conditions.GetCondition(cons, "alsoTrue")
+				falseCon := conditions.GetCondition(cons, "false")
+				_, changed := updater.
+					UpdateCondition(trueCon1.Type, metav1.ConditionUnknown, trueCon1.ObservedGeneration+1, "newReason", "newMessage").
+					UpdateCondition(trueCon2.Type, metav1.ConditionUnknown, trueCon2.ObservedGeneration+1, "newReason", "newMessage").
+					UpdateCondition("anotherOne", metav1.ConditionUnknown, 1, "newReason", "newMessage").
+					UpdateCondition(falseCon.Type, invert(falseCon.Status), falseCon.ObservedGeneration+1, "newReason", "newMessage").
+					Record(dummy).Conditions()
+				Expect(changed).To(BeTrue())
+
+				events := flush(recorder.Events)
+				Expect(events).To(ConsistOf(
+					And(
+						ContainSubstring("The following conditions changed to '%s'", metav1.ConditionUnknown),
+						ContainSubstring(trueCon1.Type),
+						ContainSubstring(trueCon2.Type),
+						ContainSubstring("anotherOne"),
+					),
+					And(
+						ContainSubstring("The following conditions changed to '%s'", invert(falseCon.Status)),
+						ContainSubstring(falseCon.Type),
+					),
+				))
+			})
+
+			It("should not record any events if no condition status changed, even if other fields changed", func() {
+				cons := testConditionSet()
+				updater := conditions.ConditionUpdater(cons, false).WithEventRecorder(recorder, conditions.EventPerNewStatus)
+				trueCon1 := conditions.GetCondition(cons, "true")
+				trueCon2 := conditions.GetCondition(cons, "alsoTrue")
+				_, changed := updater.
+					UpdateCondition(trueCon1.Type, trueCon1.Status, trueCon1.ObservedGeneration+1, "newReason", "newMessage").
+					UpdateCondition(trueCon2.Type, trueCon2.Status, trueCon2.ObservedGeneration+1, "newReason", "newMessage").
+					Record(dummy).Conditions()
+				Expect(changed).To(BeTrue())
+
+				events := flush(recorder.Events)
+				Expect(events).To(BeEmpty())
+			})
+
+			It("should record lost conditions", func() {
+				cons := testConditionSet()
+				updater := conditions.ConditionUpdater(cons, true).WithEventRecorder(recorder, conditions.EventPerNewStatus)
+				_, changed := updater.Record(dummy).Conditions()
+				Expect(changed).To(BeTrue())
+
+				events := flush(recorder.Events)
+				Expect(events).To(ConsistOf(
+					And(
+						ContainSubstring("The following conditions were removed"),
+						ContainSubstring("true"),
+						ContainSubstring("false"),
+						ContainSubstring("alsoTrue"),
+					),
+				))
+			})
+
+		})
+
+		Context("Verbosity: EventIfChanged", func() {
+
+			It("should only record a single event, no matter how many conditions changed", func() {
+				cons := testConditionSet()
+				updater := conditions.ConditionUpdater(cons, false).WithEventRecorder(recorder, conditions.EventIfChanged)
+				trueCon := conditions.GetCondition(cons, "true")
+				falseCon := conditions.GetCondition(cons, "false")
+				_, changed := updater.
+					UpdateCondition(trueCon.Type, invert(trueCon.Status), trueCon.ObservedGeneration+1, "newReason", "newMessage").
+					UpdateCondition(falseCon.Type, invert(falseCon.Status), falseCon.ObservedGeneration+1, "newReason", "newMessage").
+					UpdateCondition("new", metav1.ConditionUnknown, 1, "newReason", "newMessage").
+					RemoveCondition("alsoTrue").
+					Record(dummy).Conditions()
+				Expect(changed).To(BeTrue())
+
+				events := flush(recorder.Events)
+				Expect(events).To(ConsistOf(
+					And(
+						ContainSubstring("The following conditions have changed"),
+						ContainSubstring("true"),
+						ContainSubstring("false"),
+						ContainSubstring("alsoTrue"),
+						ContainSubstring("new"),
+					),
+				))
+			})
+
+			It("should not record any events if no condition status changed, even if other fields changed", func() {
+				cons := testConditionSet()
+				updater := conditions.ConditionUpdater(cons, false).WithEventRecorder(recorder, conditions.EventIfChanged)
+				trueCon1 := conditions.GetCondition(cons, "true")
+				trueCon2 := conditions.GetCondition(cons, "alsoTrue")
+				_, changed := updater.
+					UpdateCondition(trueCon1.Type, trueCon1.Status, trueCon1.ObservedGeneration+1, "newReason", "newMessage").
+					UpdateCondition(trueCon2.Type, trueCon2.Status, trueCon2.ObservedGeneration+1, "newReason", "newMessage").
+					Record(dummy).Conditions()
+				Expect(changed).To(BeTrue())
+
+				events := flush(recorder.Events)
+				Expect(events).To(BeEmpty())
+			})
+
+		})
+
+	})
+
 })
+
+type dummyObject struct {
+	metav1.TypeMeta `json:",inline"`
+}
+
+func (d *dummyObject) DeepCopyObject() runtime.Object {
+	return &dummyObject{
+		TypeMeta: d.TypeMeta,
+	}
+}
+
+func flush(c chan string) []string {
+	res := []string{}
+	for len(c) > 0 {
+		res = append(res, <-c)
+	}
+	return res
+}
