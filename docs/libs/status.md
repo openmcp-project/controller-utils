@@ -29,6 +29,26 @@ For simplicity, all commands can be chained:
 updatedCons, changed := conditions.ConditionUpdater(oldCons, false).UpdateCondition("myCondition", conditions.FromBool(true), myObj.Generation, "newReason", "newMessage").Conditions()
 ```
 
+### Event Recording for Conditions
+
+The condition updater can optionally record events for changed conditions. To enable event recording, call first `WithEventRecorder` and later `Record` on the `ConditionUpdater`:
+```go
+updatedCons, changed := conditions.ConditionUpdater(...).WithEventRecorder(recorder, conditions.EventIfChanged).UpdateCondition(...).Record(myObj).Conditions()
+```
+Note that `Record` records all changes (`UpdateCondition` and `RemoveCondition` calls) that happened between construction of the condition updater and the `Record` call. Changes that are done after the `Record` call will not result in events. It is therefore recommended to call this method only after all conditions have been updated. Calling `Record` multiple times will lead to duplicate events.
+
+`Record` is a no-op, if either the event recorder is `nil` (most likely because `WithEventRecorder` has not been called before) or the given object is `nil`.
+
+The `WithEventRecorder` method takes a verbosity as second argument. There are three known verbosity values, each of which is stored in a corresponding constant in the `conditions` package:
+- `perChange` (constant: `EventPerChange`)
+	- This is the most verbose option which creates a single event for each condition that was added, removed, or changed its status. It also displays the new and/or previous status of the condition, if applicable.
+- `perNewStatus` (constant: `EventPerNewStatus`)
+	- This verbosity bundles all changes to the same status in a single event. This means that it will at most record four events per conditions update: one for all conditions that became `True`, one for all that became `False`, one for all that became `Unknown`, and one for all conditions that were removed. The condition types are listed in the events, their respective previous status is not.
+- `ifChanged` (constant: `EventIfChanged`)
+	- This is the least verbose option. It will always log only a single event that bundles all changes. The condition types are listed, but the event does not allow to differentiate between added, removed, or changed conditions and does not contain any information about any condition's previous or current status.
+
+Setting the verbosity to any other than these values results in no events being recorded.
+
 ## Status Updater
 
 The status updater is based on the idea that many of our resources use a status similar to this:
@@ -140,6 +160,7 @@ You can then `Build()` the status updater and run `UpdateStatus()` to do the act
 	- The package contains constants with the field keys that are required by most of these methods. `STATUS_FIELD` refers to the `Status` field itself, the other field keys are prefixed with `STATUS_FIELD_`.
 		- The `AllStatusFields()` function returns a list containing all status field keys, _except the one for the status field itself_, for convenience.
 - The `WithCustomUpdateFunc` method can be used to inject a function that performs custom logic on the resource's status. Note that while the function gets the complete object as an argument, only changes to its status will be updated by the status updater.
+- `WithConditionEvents` can be used to enable event recording for changed conditions. The events are automatically connected to the resource from the `ReconcileResult`'s `Object` field, no events will be recorded if that field is `nil`.
 
 ### The ReconcileResult
 
