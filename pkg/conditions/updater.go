@@ -13,6 +13,8 @@ import (
 	"k8s.io/client-go/tools/record"
 )
 
+const EventReasonConditionChanged = "ConditionChanged"
+
 type EventVerbosity string
 
 const (
@@ -20,10 +22,11 @@ const (
 	// This is the most verbose setting. The old and new status of each changed condition will be visible in the event message.
 	EventPerChange EventVerbosity = "perChange"
 	// EventPerNewStatus causes one event to be recorded for each new status that any condition has reached.
-	// This means that at max three events will be recorded:
-	// - the following conditions changed to True
-	// - the following conditions changed to False
-	// - the following conditions changed to Unknown
+	// This means that at max four events will be recorded:
+	// - the following conditions changed to True (including newly added conditions)
+	// - the following conditions changed to False (including newly added conditions)
+	// - the following conditions changed to Unknown (including newly added conditions)
+	// - the following conditions were removed
 	// The old status of the conditions will not be part of the event message.
 	EventPerNewStatus EventVerbosity = "perNewStatus"
 	// EventIfChanged causes a single event to be recorded if any condition's status has changed.
@@ -188,16 +191,16 @@ func (c *conditionUpdater) Record(obj runtime.Object) *conditionUpdater {
 		for _, con := range updatedCons {
 			oldCon, found := c.original[con.Type]
 			if !found {
-				c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, "Condition '%s' added with status '%s'", con.Type, string(con.Status))
+				c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, EventReasonConditionChanged, "Condition '%s' added with status '%s'", con.Type, con.Status)
 				continue
 			}
 			if con.Status != oldCon.Status {
-				c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, "Condition '%s' changed from '%s' to '%s'", con.Type, string(oldCon.Status), string(con.Status))
+				c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, EventReasonConditionChanged, "Condition '%s' changed from '%s' to '%s'", con.Type, oldCon.Status, con.Status)
 				continue
 			}
 		}
 		for conType, oldStatus := range lostCons {
-			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, "Condition '%s' with status '%s' removed", conType, string(oldStatus))
+			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, EventReasonConditionChanged, "Condition '%s' with status '%s' removed", conType, oldStatus)
 		}
 
 	case EventPerNewStatus:
@@ -221,16 +224,16 @@ func (c *conditionUpdater) Record(obj runtime.Object) *conditionUpdater {
 		}
 
 		if trueCons.Len() > 0 {
-			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, "The following conditions changed to 'True': %s", strings.Join(sets.List(trueCons), ", "))
+			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, EventReasonConditionChanged, "The following conditions changed to 'True': %s", strings.Join(sets.List(trueCons), ", "))
 		}
 		if falseCons.Len() > 0 {
-			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, "The following conditions changed to 'False': %s", strings.Join(sets.List(falseCons), ", "))
+			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, EventReasonConditionChanged, "The following conditions changed to 'False': %s", strings.Join(sets.List(falseCons), ", "))
 		}
 		if unknownCons.Len() > 0 {
-			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, "The following conditions changed to 'Unknown': %s", strings.Join(sets.List(unknownCons), ", "))
+			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, EventReasonConditionChanged, "The following conditions changed to 'Unknown': %s", strings.Join(sets.List(unknownCons), ", "))
 		}
 		if len(lostCons) > 0 {
-			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, "The following conditions were removed: %s", strings.Join(sets.List(sets.KeySet(lostCons)), ", "))
+			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, EventReasonConditionChanged, "The following conditions were removed: %s", strings.Join(sets.List(sets.KeySet(lostCons)), ", "))
 		}
 
 	case EventIfChanged:
@@ -244,7 +247,7 @@ func (c *conditionUpdater) Record(obj runtime.Object) *conditionUpdater {
 			changedCons.Insert(conType)
 		}
 		if changedCons.Len() > 0 {
-			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, "The following conditions have changed: %s", strings.Join(sets.List(changedCons), ", "))
+			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, EventReasonConditionChanged, "The following conditions have changed: %s", strings.Join(sets.List(changedCons), ", "))
 		}
 	}
 
