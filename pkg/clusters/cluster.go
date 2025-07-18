@@ -224,10 +224,12 @@ func (c *Cluster) Cluster() cluster.Cluster {
 // Scheme returns the cluster's scheme.
 // Returns nil if the client has not been initialized.
 func (c *Cluster) Scheme() *runtime.Scheme {
-	if c.cluster == nil {
-		return nil
+	if c.cluster != nil {
+		return c.cluster.GetScheme()
+	} else if c.client != nil {
+		return c.client.Scheme()
 	}
-	return c.cluster.GetScheme()
+	return nil
 }
 
 // APIServerEndpoint returns the cluster's API server endpoint.
