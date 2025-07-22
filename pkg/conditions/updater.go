@@ -96,11 +96,6 @@ func (c *conditionUpdater) UpdateCondition(conType string, status metav1.Conditi
 		ObservedGeneration: observedGeneration,
 		LastTransitionTime: c.Now,
 	}
-	old, ok := c.conditions[conType]
-	if ok && old.Status == con.Status {
-		// update LastTransitionTime only if status changed
-		con.LastTransitionTime = old.LastTransitionTime
-	}
 	c.updates[conType] = status
 	c.conditions[conType] = con
 	return c
@@ -134,7 +129,13 @@ func (c *conditionUpdater) RemoveCondition(conType string) *conditionUpdater {
 // The conditions are returned sorted by their type.
 // The second return value indicates whether the condition list has actually changed.
 func (c *conditionUpdater) Conditions() ([]metav1.Condition, bool) {
-	res := c.updatedConditions()
+	res := collections.ProjectSlice(c.updatedConditions(), func(con metav1.Condition) metav1.Condition {
+		if c.original[con.Type].Status == con.Status {
+			// if the status has not changed, reset the LastTransitionTime to the original value
+			con.LastTransitionTime = c.original[con.Type].LastTransitionTime
+		}
+		return con
+	})
 	slices.SortStableFunc(res, func(a, b metav1.Condition) int {
 		return strings.Compare(a.Type, b.Type)
 	})
