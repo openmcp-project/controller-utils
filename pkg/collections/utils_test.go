@@ -12,7 +12,7 @@ import (
 
 var _ = Describe("Utils Tests", func() {
 
-	Context("ProjectSlice", func() {
+	Context("ProjectSliceToSlice", func() {
 
 		projectFunc := func(i int) int {
 			return i * 2
@@ -20,19 +20,46 @@ var _ = Describe("Utils Tests", func() {
 
 		It("should use the projection function on each element of the slice", func() {
 			src := []int{1, 2, 3, 4}
-			projected := collections.ProjectSlice(src, projectFunc)
+			projected := collections.ProjectSliceToSlice(src, projectFunc)
 			Expect(projected).To(Equal([]int{2, 4, 6, 8}))
 			Expect(src).To(Equal([]int{1, 2, 3, 4}), "original slice should not be modified")
 		})
 
 		It("should return an empty slice for an empty or nil input slice", func() {
-			Expect(collections.ProjectSlice(nil, projectFunc)).To(BeEmpty())
-			Expect(collections.ProjectSlice([]int{}, projectFunc)).To(BeEmpty())
+			Expect(collections.ProjectSliceToSlice(nil, projectFunc)).To(BeEmpty())
+			Expect(collections.ProjectSliceToSlice([]int{}, projectFunc)).To(BeEmpty())
 		})
 
 		It("should return nil for a nil projection function", func() {
 			src := []int{1, 2, 3, 4}
-			projected := collections.ProjectSlice[int, int](src, nil)
+			projected := collections.ProjectSliceToSlice[int, int](src, nil)
+			Expect(projected).To(BeNil())
+			Expect(src).To(Equal([]int{1, 2, 3, 4}), "original slice should not be modified")
+		})
+
+	})
+
+	Context("ProjectSliceToMap", func() {
+
+		projectFunc := func(i int) (int, int) {
+			return i, i * 2
+		}
+
+		It("should use the projection function on each element of the slice", func() {
+			src := []int{1, 2, 3, 4}
+			projected := collections.ProjectSliceToMap(src, projectFunc)
+			Expect(projected).To(Equal(map[int]int{1: 2, 2: 4, 3: 6, 4: 8}))
+			Expect(src).To(Equal([]int{1, 2, 3, 4}), "original slice should not be modified")
+		})
+
+		It("should return an empty slice for an empty or nil input slice", func() {
+			Expect(collections.ProjectSliceToMap(nil, projectFunc)).To(BeEmpty())
+			Expect(collections.ProjectSliceToMap([]int{}, projectFunc)).To(BeEmpty())
+		})
+
+		It("should return nil for a nil projection function", func() {
+			src := []int{1, 2, 3, 4}
+			projected := collections.ProjectSliceToMap[int, int, int](src, nil)
 			Expect(projected).To(BeNil())
 			Expect(src).To(Equal([]int{1, 2, 3, 4}), "original slice should not be modified")
 		})
