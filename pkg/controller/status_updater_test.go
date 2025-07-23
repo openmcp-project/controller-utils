@@ -194,6 +194,47 @@ var _ = Describe("Status Updater", func() {
 		}
 	})
 
+	Context("GenerateCreateConditionFunc", func() {
+
+		It("should add the condition to the given ReconcileResult", func() {
+			rr := controller.ReconcileResult[*CustomObject]{
+				Object: &CustomObject{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:       "test",
+						Namespace:  "default",
+						Generation: 15,
+					},
+				},
+				Conditions: dummyConditions(),
+			}
+			createCon := controller.GenerateCreateConditionFunc(&rr)
+			createCon("TestConditionFoo", metav1.ConditionTrue, "TestReasonFoo", "TestMessageFoo")
+			Expect(rr.Conditions).To(ConsistOf(
+				MatchCondition(TestConditionFromCondition(dummyConditions()[0])),
+				MatchCondition(TestConditionFromCondition(dummyConditions()[1])),
+				MatchCondition(TestConditionFromValues("TestConditionFoo", metav1.ConditionTrue, 15, "TestReasonFoo", "TestMessageFoo", metav1.Time{})),
+			))
+		})
+
+		It("should create the condition list, if it is nil", func() {
+			rr := controller.ReconcileResult[*CustomObject]{
+				Object: &CustomObject{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:       "test",
+						Namespace:  "default",
+						Generation: 15,
+					},
+				},
+			}
+			createCon := controller.GenerateCreateConditionFunc(&rr)
+			createCon("TestConditionFoo", metav1.ConditionTrue, "TestReasonFoo", "TestMessageFoo")
+			Expect(rr.Conditions).To(ConsistOf(
+				MatchCondition(TestConditionFromValues("TestConditionFoo", metav1.ConditionTrue, 15, "TestReasonFoo", "TestMessageFoo", metav1.Time{})),
+			))
+		})
+
+	})
+
 })
 
 func preconfiguredStatusUpdaterBuilder() *controller.StatusUpdaterBuilder[*CustomObject] {

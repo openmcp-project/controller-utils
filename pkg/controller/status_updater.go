@@ -231,7 +231,11 @@ func (s *statusUpdater[Obj]) UpdateStatus(ctx context.Context, c client.Client, 
 		}
 		cu.Now = now
 		for _, con := range rr.Conditions {
-			cu.UpdateConditionFromTemplate(con)
+			gen := con.ObservedGeneration
+			if gen == 0 {
+				gen = rr.Object.GetGeneration()
+			}
+			cu.UpdateCondition(con.Type, con.Status, gen, con.Reason, con.Message)
 		}
 		newCons, _ := cu.Record(rr.Object).Conditions()
 		SetField(status, s.fieldNames[STATUS_FIELD_CONDITIONS], newCons)
@@ -365,4 +369,22 @@ type ReconcileResult[Obj client.Object] struct {
 	// Also note that names of conditions are globally unique, so take care to avoid conflicts with other objects.
 	// The lastTransition timestamp of the condition will be overwritten with the current time while updating.
 	Conditions []metav1.Condition
+}
+
+// GenerateCreateConditionFunc returns a function that can be used to add a condition to the given ReconcileResult.
+// If the ReconcileResult's Object is not nil, the condition's ObservedGeneration is set to the object's generation.
+func GenerateCreateConditionFunc[Obj client.Object](rr *ReconcileResult[Obj]) func(conType string, status metav1.ConditionStatus, reason, message string) {
+	var gen int64 = 0
+	if any(rr.Object) != nil {
+		gen = rr.Object.GetGeneration()
+	}
+	return func(conType string, status metav1.ConditionStatus, reason, message string) {
+		rr.Conditions = append(rr.Conditions, metav1.Condition{
+			Type:               conType,
+			Status:             status,
+			ObservedGeneration: gen,
+			Reason:             reason,
+			Message:            message,
+		})
+	}
 }

@@ -161,6 +161,16 @@ var _ = Describe("Conditions", func() {
 			Expect(newCon.LastTransitionTime.After(oldCon.LastTransitionTime.Time)).To(BeTrue())
 		})
 
+		It("should not change the last transition time if the same condition is updated multiple times with the last update setting it to the original value again", func() {
+			cons := testConditionSet()
+			oldCon := conditions.GetCondition(cons, "true")
+			updater := conditions.ConditionUpdater(cons, false)
+			updated, changed := updater.UpdateCondition(oldCon.Type, invert(oldCon.Status), oldCon.ObservedGeneration+1, "newReason", "newMessage").
+				UpdateCondition(oldCon.Type, oldCon.Status, oldCon.ObservedGeneration, oldCon.Reason, oldCon.Message).Conditions()
+			Expect(changed).To(BeFalse())
+			Expect(updated).To(ConsistOf(cons))
+		})
+
 		It("should sort the conditions by type", func() {
 			cons := []metav1.Condition{
 				TestConditionFromValues("c", conditions.FromBool(true), 0, "reason", "message", metav1.Now()).ToCondition(),

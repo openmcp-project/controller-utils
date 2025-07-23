@@ -88,6 +88,10 @@ func (c *conditionUpdater) WithEventRecorder(recorder record.EventRecorder, verb
 // All fields of the condition are updated with the values given in the arguments, but the condition's LastTransitionTime is only updated (with the timestamp contained in the receiver struct) if the status changed.
 // Returns the receiver for easy chaining.
 func (c *conditionUpdater) UpdateCondition(conType string, status metav1.ConditionStatus, observedGeneration int64, reason, message string) *conditionUpdater {
+	if reason == "" {
+		// the metav1.Condition type requires a reason, so let's add a dummy if none is given
+		reason = conType + string(status)
+	}
 	con := metav1.Condition{
 		Type:               conType,
 		Status:             status,
@@ -95,11 +99,6 @@ func (c *conditionUpdater) UpdateCondition(conType string, status metav1.Conditi
 		Message:            message,
 		ObservedGeneration: observedGeneration,
 		LastTransitionTime: c.Now,
-	}
-	old, ok := c.conditions[conType]
-	if ok && old.Status == con.Status {
-		// update LastTransitionTime only if status changed
-		con.LastTransitionTime = old.LastTransitionTime
 	}
 	c.updates[conType] = status
 	c.conditions[conType] = con
@@ -134,7 +133,13 @@ func (c *conditionUpdater) RemoveCondition(conType string) *conditionUpdater {
 // The conditions are returned sorted by their type.
 // The second return value indicates whether the condition list has actually changed.
 func (c *conditionUpdater) Conditions() ([]metav1.Condition, bool) {
-	res := c.updatedConditions()
+	res := collections.ProjectSlice(c.updatedConditions(), func(con metav1.Condition) metav1.Condition {
+		if c.original[con.Type].Status == con.Status {
+			// if the status has not changed, reset the LastTransitionTime to the original value
+			con.LastTransitionTime = c.original[con.Type].LastTransitionTime
+		}
+		return con
+	})
 	slices.SortStableFunc(res, func(a, b metav1.Condition) int {
 		return strings.Compare(a.Type, b.Type)
 	})
