@@ -88,6 +88,10 @@ func (c *conditionUpdater) WithEventRecorder(recorder record.EventRecorder, verb
 // All fields of the condition are updated with the values given in the arguments, but the condition's LastTransitionTime is only updated (with the timestamp contained in the receiver struct) if the status changed.
 // Returns the receiver for easy chaining.
 func (c *conditionUpdater) UpdateCondition(conType string, status metav1.ConditionStatus, observedGeneration int64, reason, message string) *conditionUpdater {
+	if reason == "" {
+		// the metav1.Condition type requires a reason, so let's add a dummy if none is given
+		reason = conType + string(status)
+	}
 	con := metav1.Condition{
 		Type:               conType,
 		Status:             status,
