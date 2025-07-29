@@ -78,4 +78,71 @@ var _ = Describe("Map Utils Tests", func() {
 
 	})
 
+	Context("ContainsKeysWithValues", func() {
+
+		It("should return true if the second map is empty or nil", func() {
+			m1 := map[string]string{"foo": "bar", "bar": "baz"}
+			Expect(maps.ContainsKeysWithValues(m1, nil)).To(BeTrue())
+			Expect(maps.ContainsKeysWithValues(m1, map[string]string{})).To(BeTrue())
+			Expect(maps.ContainsKeysWithValues[string, string](nil, nil)).To(BeTrue())
+		})
+
+		It("should return true if both maps are identical", func() {
+			m1 := map[string]string{"foo": "bar", "bar": "baz"}
+			Expect(maps.ContainsKeysWithValues(m1, m1)).To(BeTrue())
+		})
+
+		It("should return true if the first map contains all keys and values of the second map", func() {
+			m1 := map[string]string{"foo": "bar", "bar": "baz", "baz": "asdf"}
+			m2 := map[string]string{"foo": "bar", "baz": "asdf"}
+			Expect(maps.ContainsKeysWithValues(m1, m2)).To(BeTrue())
+
+			m3 := map[string]string{"bar": "baz"}
+			Expect(maps.ContainsKeysWithValues(m1, m3)).To(BeTrue())
+		})
+
+		It("should return false if the first map contains all keys but has different values", func() {
+			m1 := map[string]string{"foo": "bar", "bar": "baz"}
+			m2 := map[string]string{"foo": "baz", "bar": "baz"}
+			Expect(maps.ContainsKeysWithValues(m1, m2)).To(BeFalse())
+		})
+
+		It("should return false if the first map does not contain all keys of the second map", func() {
+			m1 := map[string]string{"foo": "bar"}
+			m2 := map[string]string{"foo": "bar", "bar": "baz"}
+			Expect(maps.ContainsKeysWithValues(m1, m2)).To(BeFalse())
+		})
+
+		It("should work with a custom equality function", func() {
+			m1 := map[string]string{"foo": "bar", "bar": "baz"}
+			m2 := map[string]string{"foo": "xyz", "bar": "mno"}
+			cmp := func(a, b string) bool {
+				return len(a) == len(b)
+			}
+			Expect(maps.ContainsKeysWithValuesFunc(m1, m2, cmp)).To(BeTrue())
+		})
+
+	})
+
+	Context("ContainsKeys", func() {
+
+		It("should return true if all keys are present", func() {
+			m1 := map[string]string{"foo": "bar", "bar": "baz", "baz": "asdf"}
+			Expect(maps.ContainsKeys(m1, "foo", "bar")).To(BeTrue())
+		})
+
+		It("should return true if no keys are provided", func() {
+			m1 := map[string]string{"foo": "bar", "bar": "baz", "baz": "asdf"}
+			Expect(maps.ContainsKeys(m1)).To(BeTrue())
+			Expect(maps.ContainsKeys[string, string](nil)).To(BeTrue())
+		})
+
+		It("should return false if any key is missing", func() {
+			m1 := map[string]string{"foo": "bar", "bar": "baz", "baz": "asdf"}
+			Expect(maps.ContainsKeys(m1, "foo", "missing")).To(BeFalse())
+			Expect(maps.ContainsKeys(m1, "missing")).To(BeFalse())
+		})
+
+	})
+
 })
