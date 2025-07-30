@@ -15,6 +15,7 @@
 - [Readiness Checks](libs/readiness.md)
 - [Kubernetes Resource Management](libs/resource.md)
 - [Retrying k8s Operations](libs/retry.md)
+- [Smart Requeuing of Kubernetes Resources](libs/smartrequeue.md)
 - [Kubernetes Resource Status Updating](libs/status.md)
 - [Testing](libs/testing.md)
 - [Thread Management](libs/threads.md)
