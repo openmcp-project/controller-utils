@@ -1,6 +1,8 @@
 package maps
 
 import (
+	"reflect"
+
 	"k8s.io/utils/ptr"
 
 	"github.com/openmcp-project/controller-utils/pkg/collections/filters"
@@ -54,6 +56,36 @@ func Intersect[K comparable, V any](source map[K]V, maps ...map[K]V) map[K]V {
 	}
 
 	return res
+}
+
+// ContainsKeysWithValues checks if 'super' is a superset of 'sub', meaning that all keys of 'sub' are also present in 'super' with the same values.
+// Uses reflect.DeepEqual to compare the values, use ContainsMapFunc if you want to use a custom equality function.
+func ContainsKeysWithValues[K comparable, V any](super, sub map[K]V) bool {
+	return ContainsKeysWithValuesFunc(super, sub, func(a, b V) bool {
+		return reflect.DeepEqual(a, b)
+	})
+}
+
+// ContainsKeysWithValuesFunc checks if 'super' is a superset of 'sub', meaning that all keys of 'sub' are also present in 'super' with the same values.
+// The values are compared using the provided equality function.
+// If the equality function returns false for any key-value pair, it returns false.
+func ContainsKeysWithValuesFunc[K comparable, V any](super, sub map[K]V, equal func(a, b V) bool) bool {
+	for k, bv := range sub {
+		if av, ok := super[k]; !ok || !equal(av, bv) {
+			return false
+		}
+	}
+	return true
+}
+
+// ContainsKeys returns true if all given keys are present in the map.
+func ContainsKeys[K comparable, V any](super map[K]V, keys ...K) bool {
+	for _, k := range keys {
+		if _, ok := super[k]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 // GetAny returns an arbitrary key-value pair from the map as a pointer to a pairs.Pair.
