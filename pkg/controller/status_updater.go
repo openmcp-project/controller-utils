@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/openmcp-project/controller-utils/pkg/conditions"
+	"github.com/openmcp-project/controller-utils/pkg/controller/smartrequeue"
 	"github.com/openmcp-project/controller-utils/pkg/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -120,6 +121,29 @@ func (b *StatusUpdaterBuilder[Obj]) WithCustomUpdateFunc(f func(obj Obj, rr Reco
 	return b
 }
 
+type SmartRequeueAction string
+
+const (
+	SR_BACKOFF    SmartRequeueAction = "Backoff"
+	SR_RESET      SmartRequeueAction = "Reset"
+	SR_NO_REQUEUE SmartRequeueAction = "NoRequeue"
+)
+
+// WithSmartRequeue integrates the smart requeue logic into the status updater.
+// Requires a smartrequeue.Store to be passed in (this needs to be persistent across multiple reconciliations and therefore cannot be stored in the status updater itself).
+// The action determines when the object should be requeued:
+// - "Backoff": the object is requeued with an increasing backoff, as specified in the store.
+// - "Reset": the object is requeued, but the backoff is reset to its minimal value, as specified in the store.
+// - "NoRequeue": the object is not requeued.
+// If the 'Result' field in the ReconcileResult has a non-zero RequeueAfter value set, that one is used if it is earlier than the one from smart requeue or if "NoRequeue" has been specified.
+// This function only has an effect if the Object in the ReconcileResult is not nil, the smart requeue store is not nil, and the action is one of the known values.
+// Also, if a reconciliation error occurred, the requeue interval will be reset, but no requeueAfter duration will be set, because controller-runtime will take care of requeuing the object anyway.
+func (b *StatusUpdaterBuilder[Obj]) WithSmartRequeue(store *smartrequeue.Store, action SmartRequeueAction) *StatusUpdaterBuilder[Obj] {
+	b.internal.smartRequeueStore = store
+	b.internal.smartRequeueAction = action
+	return b
+}
+
 // Build returns the status updater.
 func (b *StatusUpdaterBuilder[Obj]) Build() *statusUpdater[Obj] {
 	return b.internal
@@ -158,6 +182,8 @@ type statusUpdater[Obj client.Object] struct {
 	removeUntouchedConditions bool
 	eventRecorder             record.EventRecorder
 	eventVerbosity            conditions.EventVerbosity
+	smartRequeueStore         *smartrequeue.Store
+	smartRequeueAction        SmartRequeueAction
 }
 
 func newStatusUpdater[Obj client.Object]() *statusUpdater[Obj] {
@@ -184,6 +210,8 @@ func defaultPhaseUpdateFunc[Obj client.Object](obj Obj, _ ReconcileResult[Obj]) 
 // UpdateStatus updates the status of the object in the given ReconcileResult, using the previously set field names and functions.
 // The object is expected to be a pointer to a struct with the status field.
 // If the 'Object' field in the ReconcileResult is nil, the status update becomes a no-op.
+//
+//nolint:gocyclo
 func (s *statusUpdater[Obj]) UpdateStatus(ctx context.Context, c client.Client, rr ReconcileResult[Obj]) (ctrl.Result, error) {
 	errs := errors.NewReasonableErrorList(rr.ReconcileError)
 	if IsNil(rr.Object) {
@@ -257,6 +285,25 @@ func (s *statusUpdater[Obj]) UpdateStatus(ctx context.Context, c client.Client, 
 	// update status in cluster
 	if err := c.Status().Patch(ctx, rr.Object, client.MergeFrom(rr.OldObject)); err != nil {
 		errs.Append(fmt.Errorf("error patching status: %w", err))
+	}
+
+	if s.smartRequeueStore != nil {
+		var srRes ctrl.Result
+		if rr.ReconcileError != nil {
+			srRes, _ = s.smartRequeueStore.For(rr.Object).Error(rr.ReconcileError)
+		} else {
+			switch s.smartRequeueAction {
+			case SR_BACKOFF:
+				srRes, _ = s.smartRequeueStore.For(rr.Object).Backoff()
+			case SR_RESET:
+				srRes, _ = s.smartRequeueStore.For(rr.Object).Reset()
+			case SR_NO_REQUEUE:
+				srRes, _ = s.smartRequeueStore.For(rr.Object).Never()
+			}
+		}
+		if srRes.RequeueAfter > 0 && (rr.Result.RequeueAfter == 0 || srRes.RequeueAfter < rr.Result.RequeueAfter) {
+			rr.Result.RequeueAfter = srRes.RequeueAfter
+		}
 	}
 
 	return rr.Result, errs.Aggregate()
