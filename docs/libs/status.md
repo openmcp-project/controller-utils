@@ -174,6 +174,7 @@ The `ReconcileResult` that is passed into the status updater is expected to cont
 - `Reason` and `Message` can be set to set the status' corresponding fields.
 	- If either one is nil, but `ReconcileError` is not, it will be filled with a value derived from the error.
 - `Conditions` contains the updated conditions. Depending on with which arguments `WithConditionUpdater` was called, the existing conditions will be either updated with these ones (keeping the other ones), or be replaced by them.
+- `ConditionsToRemove` is a list of condition types that should be removed from the conditions. This is mostly useful if the condition updater is used in the 'keep untouched conditions' mode.
 - `Object` contains the object to be updated.
 	- If `Object` is nil, no status update will be performed.
 - `OldObject` holds the version of the object that will be used as a base for constructing the patch during the status update.
