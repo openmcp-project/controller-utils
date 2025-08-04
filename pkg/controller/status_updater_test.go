@@ -9,11 +9,13 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/openmcp-project/controller-utils/pkg/conditions"
+	"github.com/openmcp-project/controller-utils/pkg/controller/smartrequeue"
 	. "github.com/openmcp-project/controller-utils/pkg/testing/matchers"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 
@@ -192,6 +194,56 @@ var _ = Describe("Status Updater", func() {
 				))
 			}
 		}
+	})
+
+	Context("Smart Requeue", func() {
+
+		It("should add a requeueAfter duration if configured", func() {
+			env := testutils.NewEnvironmentBuilder().WithFakeClient(coScheme).WithInitObjectPath("testdata", "test-02").WithDynamicObjectsWithStatus(&CustomObject{}).Build()
+			obj := &CustomObject{}
+			Expect(env.Client().Get(env.Ctx, controller.ObjectKey("status", "default"), obj)).To(Succeed())
+			rr := controller.ReconcileResult[*CustomObject]{
+				Object:     obj,
+				Conditions: dummyConditions(),
+			}
+			store := smartrequeue.NewStore(1*time.Second, 10*time.Second, 2.0)
+			su := preconfiguredStatusUpdaterBuilder().WithPhaseUpdateFunc(func(obj *CustomObject, rr controller.ReconcileResult[*CustomObject]) (string, error) {
+				return PhaseSucceeded, nil
+			}).WithSmartRequeue(store, controller.SR_RESET).Build()
+			res, err := su.UpdateStatus(env.Ctx, env.Client(), rr)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res.RequeueAfter).To(Equal(1 * time.Second))
+		})
+
+		It("should keep the smaller requeueAfter duration if smart requeue and RequeueAfter in the ReconcileResult are set", func() {
+			env := testutils.NewEnvironmentBuilder().WithFakeClient(coScheme).WithInitObjectPath("testdata", "test-02").WithDynamicObjectsWithStatus(&CustomObject{}).Build()
+			obj := &CustomObject{}
+			Expect(env.Client().Get(env.Ctx, controller.ObjectKey("status", "default"), obj)).To(Succeed())
+			rr := controller.ReconcileResult[*CustomObject]{
+				Object:     obj,
+				Conditions: dummyConditions(),
+				Result: ctrl.Result{
+					RequeueAfter: 30 * time.Second,
+				},
+			}
+			store := smartrequeue.NewStore(1*time.Second, 10*time.Second, 2.0)
+			su := preconfiguredStatusUpdaterBuilder().WithPhaseUpdateFunc(func(obj *CustomObject, rr controller.ReconcileResult[*CustomObject]) (string, error) {
+				return PhaseSucceeded, nil
+			}).WithSmartRequeue(store, controller.SR_RESET).Build()
+			res, err := su.UpdateStatus(env.Ctx, env.Client(), rr)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res.RequeueAfter).To(Equal(1 * time.Second))
+
+			rr.Result.RequeueAfter = 30 * time.Second
+			store = smartrequeue.NewStore(1*time.Minute, 10*time.Minute, 2.0)
+			su = preconfiguredStatusUpdaterBuilder().WithPhaseUpdateFunc(func(obj *CustomObject, rr controller.ReconcileResult[*CustomObject]) (string, error) {
+				return PhaseSucceeded, nil
+			}).WithSmartRequeue(store, controller.SR_RESET).Build()
+			res, err = su.UpdateStatus(env.Ctx, env.Client(), rr)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res.RequeueAfter).To(Equal(30 * time.Second))
+		})
+
 	})
 
 	Context("GenerateCreateConditionFunc", func() {

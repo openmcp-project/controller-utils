@@ -161,6 +161,9 @@ You can then `Build()` the status updater and run `UpdateStatus()` to do the act
 		- The `AllStatusFields()` function returns a list containing all status field keys, _except the one for the status field itself_, for convenience.
 - The `WithCustomUpdateFunc` method can be used to inject a function that performs custom logic on the resource's status. Note that while the function gets the complete object as an argument, only changes to its status will be updated by the status updater.
 - `WithConditionEvents` can be used to enable event recording for changed conditions. The events are automatically connected to the resource from the `ReconcileResult`'s `Object` field, no events will be recorded if that field is `nil`.
+- By using `WithSmartRequeue`, the [smart requeuing logic](./smartrequeue.md) can be used.
+	- A `smartrequeue.Store` is required to be configured outside of the status updater, because it has to be persisted across multiple reconciliations.
+	- It is also possible to use the smart requeue logic explicitly and modify the `ReconcileResult`'s `Result` field with the returned value, but the integration should be easier to use, since both, the smart requeue logic as well as the status updater, return a `reconcile.Result` and an `error`, which are intended to be directly used as return values for the `Reconcile` method.
 
 ### The ReconcileResult
 
