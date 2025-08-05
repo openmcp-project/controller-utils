@@ -133,7 +133,7 @@ func (c *conditionUpdater) RemoveCondition(conType string) *conditionUpdater {
 // The conditions are returned sorted by their type.
 // The second return value indicates whether the condition list has actually changed.
 func (c *conditionUpdater) Conditions() ([]metav1.Condition, bool) {
-	res := collections.ProjectSlice(c.updatedConditions(), func(con metav1.Condition) metav1.Condition {
+	res := collections.ProjectSliceToSlice(c.updatedConditions(), func(con metav1.Condition) metav1.Condition {
 		if c.original[con.Type].Status == con.Status {
 			// if the status has not changed, reset the LastTransitionTime to the original value
 			con.LastTransitionTime = c.original[con.Type].LastTransitionTime
