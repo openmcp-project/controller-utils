@@ -181,3 +181,10 @@ The `ReconcileResult` that is passed into the status updater is expected to cont
 	- If this is nil, `Object` will be used instead.
 	- If this is non-nil, it must not point to the same instance as `Object` - use the `DeepCopy()` function to create a different instance.
 	- All changes to `Object`'s status that are not part to `OldObject`'s status will be included in the patch during the status update. This can be used to inject custom changes to the status into the status update (in addition to the `WithCustomUpdateFunc` mentioned above).
+- `SmartRequeue` contains the requeuing information for the [smart requeuing logic](./smartrequeue.md).
+	- This field has no effect unless `WithSmartRequeue` has been called on the status updater builder.
+	- If `ReconcileError` is not nil, the value has no effect and the smart requeue error logic is used instead.
+	- Valid values are:
+		- `Backoff` to requeue the object with an increasing backoff
+		- `Reset` to requeue the object, but reset the backoff interval to its minimum
+		- `NoRequeue` to not requeue the object

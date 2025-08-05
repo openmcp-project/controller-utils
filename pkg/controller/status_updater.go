@@ -138,9 +138,8 @@ const (
 // If the 'Result' field in the ReconcileResult has a non-zero RequeueAfter value set, that one is used if it is earlier than the one from smart requeue or if "NoRequeue" has been specified.
 // This function only has an effect if the Object in the ReconcileResult is not nil, the smart requeue store is not nil, and the action is one of the known values.
 // Also, if a reconciliation error occurred, the requeue interval will be reset, but no requeueAfter duration will be set, because controller-runtime will take care of requeuing the object anyway.
-func (b *StatusUpdaterBuilder[Obj]) WithSmartRequeue(store *smartrequeue.Store, action SmartRequeueAction) *StatusUpdaterBuilder[Obj] {
+func (b *StatusUpdaterBuilder[Obj]) WithSmartRequeue(store *smartrequeue.Store) *StatusUpdaterBuilder[Obj] {
 	b.internal.smartRequeueStore = store
-	b.internal.smartRequeueAction = action
 	return b
 }
 
@@ -183,7 +182,6 @@ type statusUpdater[Obj client.Object] struct {
 	eventRecorder             record.EventRecorder
 	eventVerbosity            conditions.EventVerbosity
 	smartRequeueStore         *smartrequeue.Store
-	smartRequeueAction        SmartRequeueAction
 }
 
 func newStatusUpdater[Obj client.Object]() *statusUpdater[Obj] {
@@ -297,7 +295,7 @@ func (s *statusUpdater[Obj]) UpdateStatus(ctx context.Context, c client.Client, 
 		if rr.ReconcileError != nil {
 			srRes, _ = s.smartRequeueStore.For(rr.Object).Error(rr.ReconcileError)
 		} else {
-			switch s.smartRequeueAction {
+			switch rr.SmartRequeue {
 			case SR_BACKOFF:
 				srRes, _ = s.smartRequeueStore.For(rr.Object).Backoff()
 			case SR_RESET:
@@ -424,6 +422,9 @@ type ReconcileResult[Obj client.Object] struct {
 	// ConditionsToRemove is an optional slice of condition types for which the corresponding conditions should be removed from the status.
 	// This is useful if you want to remove conditions that are no longer relevant.
 	ConditionsToRemove []string
+	// SmartRequeue determines if/when the object should be requeued.
+	// Has no effect unless WithSmartRequeue() has been called on the status updater.
+	SmartRequeue SmartRequeueAction
 }
 
 // GenerateCreateConditionFunc returns a function that can be used to add a condition to the given ReconcileResult.
