@@ -7,3 +7,5 @@ Use `NewStore` in the constructor of the reconciler. During reconciliation, the 
 - `Never` does not requeue the object
 - `Backoff` requeues the object with an increasing backoff every time it is called on the same object
 - `Reset` requeues the object, but resets the duration to its minimal value
+
+There is also an integration into the [status updater](./status.md) for the smart requeuing logic.
