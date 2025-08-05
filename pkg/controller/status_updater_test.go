@@ -196,13 +196,14 @@ var _ = Describe("Status Updater", func() {
 			obj := &CustomObject{}
 			Expect(env.Client().Get(env.Ctx, controller.ObjectKey("status", "default"), obj)).To(Succeed())
 			rr := controller.ReconcileResult[*CustomObject]{
-				Object:     obj,
-				Conditions: dummyConditions(),
+				Object:       obj,
+				Conditions:   dummyConditions(),
+				SmartRequeue: controller.SR_RESET,
 			}
 			store := smartrequeue.NewStore(1*time.Second, 10*time.Second, 2.0)
 			su := preconfiguredStatusUpdaterBuilder().WithPhaseUpdateFunc(func(obj *CustomObject, rr controller.ReconcileResult[*CustomObject]) (string, error) {
 				return PhaseSucceeded, nil
-			}).WithSmartRequeue(store, controller.SR_RESET).Build()
+			}).WithSmartRequeue(store).Build()
 			res, err := su.UpdateStatus(env.Ctx, env.Client(), rr)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res.RequeueAfter).To(Equal(1 * time.Second))
@@ -218,11 +219,12 @@ var _ = Describe("Status Updater", func() {
 				Result: ctrl.Result{
 					RequeueAfter: 30 * time.Second,
 				},
+				SmartRequeue: controller.SR_RESET,
 			}
 			store := smartrequeue.NewStore(1*time.Second, 10*time.Second, 2.0)
 			su := preconfiguredStatusUpdaterBuilder().WithPhaseUpdateFunc(func(obj *CustomObject, rr controller.ReconcileResult[*CustomObject]) (string, error) {
 				return PhaseSucceeded, nil
-			}).WithSmartRequeue(store, controller.SR_RESET).Build()
+			}).WithSmartRequeue(store).Build()
 			res, err := su.UpdateStatus(env.Ctx, env.Client(), rr)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res.RequeueAfter).To(Equal(1 * time.Second))
@@ -231,7 +233,7 @@ var _ = Describe("Status Updater", func() {
 			store = smartrequeue.NewStore(1*time.Minute, 10*time.Minute, 2.0)
 			su = preconfiguredStatusUpdaterBuilder().WithPhaseUpdateFunc(func(obj *CustomObject, rr controller.ReconcileResult[*CustomObject]) (string, error) {
 				return PhaseSucceeded, nil
-			}).WithSmartRequeue(store, controller.SR_RESET).Build()
+			}).WithSmartRequeue(store).Build()
 			res, err = su.UpdateStatus(env.Ctx, env.Client(), rr)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res.RequeueAfter).To(Equal(30 * time.Second))
