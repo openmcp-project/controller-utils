@@ -123,7 +123,6 @@ var _ = Describe("Status Updater", func() {
 		env := testutils.NewEnvironmentBuilder().WithFakeClient(coScheme).WithInitObjectPath("testdata", "test-02").WithDynamicObjectsWithStatus(&CustomObject{}).Build()
 		obj := &CustomObject{}
 		Expect(env.Client().Get(env.Ctx, controller.ObjectKey("status", "default"), obj)).To(Succeed())
-		oldTransitionTime := conditions.GetCondition(obj.Status.Conditions, "TestConditionTrue").LastTransitionTime
 		before := obj.DeepCopy()
 		for _, disabledField := range controller.AllStatusFields() {
 			By(fmt.Sprintf("Testing disabled field %s", disabledField))
@@ -132,10 +131,11 @@ var _ = Describe("Status Updater", func() {
 			obj.Status = before.Status
 			Expect(env.Client().Status().Patch(env.Ctx, obj, client.MergeFrom(modified))).To(Succeed())
 			rr := controller.ReconcileResult[*CustomObject]{
-				Object:     obj,
-				Conditions: dummyConditions(),
-				Reason:     "TestReason",
-				Message:    "TestMessage",
+				Object:             obj,
+				Conditions:         dummyConditions(),
+				Reason:             "TestReason",
+				Message:            "TestMessage",
+				ConditionsToRemove: []string{"TestConditionTrue"},
 			}
 			su := preconfiguredStatusUpdaterBuilder().WithPhaseUpdateFunc(func(obj *CustomObject, rr controller.ReconcileResult[*CustomObject]) (string, error) {
 				return PhaseSucceeded, nil
@@ -177,20 +177,13 @@ var _ = Describe("Status Updater", func() {
 			} else {
 				Expect(obj.Status.Conditions).To(ConsistOf(
 					MatchCondition(TestCondition().
-						WithType("TestConditionTrue").
-						WithStatus(metav1.ConditionTrue).
-						WithObservedGeneration(10).
-						WithReason("TestReasonTrue").
-						WithMessage("TestMessageTrue").
-						WithLastTransitionTime(oldTransitionTime)),
-					MatchCondition(TestCondition().
 						WithType("TestConditionFalse").
 						WithStatus(metav1.ConditionFalse).
 						WithObservedGeneration(10).
 						WithReason("TestReasonFalse").
 						WithMessage("TestMessageFalse").
 						WithLastTransitionTime(now).
-						WithTimestampTolerance(1*time.Second)),
+						WithTimestampTolerance(1 * time.Second)),
 				))
 			}
 		}

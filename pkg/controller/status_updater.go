@@ -265,6 +265,11 @@ func (s *statusUpdater[Obj]) UpdateStatus(ctx context.Context, c client.Client, 
 			}
 			cu.UpdateCondition(con.Type, con.Status, gen, con.Reason, con.Message)
 		}
+		if len(rr.ConditionsToRemove) > 0 {
+			for _, conType := range rr.ConditionsToRemove {
+				cu.RemoveCondition(conType)
+			}
+		}
 		newCons, _ := cu.Record(rr.Object).Conditions()
 		SetField(status, s.fieldNames[STATUS_FIELD_CONDITIONS], newCons)
 	}
@@ -416,6 +421,9 @@ type ReconcileResult[Obj client.Object] struct {
 	// Also note that names of conditions are globally unique, so take care to avoid conflicts with other objects.
 	// The lastTransition timestamp of the condition will be overwritten with the current time while updating.
 	Conditions []metav1.Condition
+	// ConditionsToRemove is an optional slice of condition types for which the corresponding conditions should be removed from the status.
+	// This is useful if you want to remove conditions that are no longer relevant.
+	ConditionsToRemove []string
 }
 
 // GenerateCreateConditionFunc returns a function that can be used to add a condition to the given ReconcileResult.
