@@ -1,6 +1,6 @@
 module github.com/openmcp-project/controller-utils
 
-go 1.24.5
+go 1.24.6
 
 replace github.com/openmcp-project/controller-utils/api => ./api
 
