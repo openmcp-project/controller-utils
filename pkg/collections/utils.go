@@ -1,16 +1,43 @@
 package collections
 
-// ProjectSlice takes a slice and a projection function and applies this function to each element of the slice.
+// ProjectSliceToSlice takes a slice and a projection function and applies this function to each element of the slice.
 // It returns a new slice containing the results of the projection.
 // The original slice is not modified.
 // If the projection function is nil, it returns nil.
+//
+// Deprecated: With the introduction of ProjectSliceToMap, this function has been replaced by ProjectSliceToSlice for better naming consistency.
 func ProjectSlice[X any, Y any](src []X, project func(X) Y) []Y {
+	return ProjectSliceToSlice(src, project)
+}
+
+// ProjectSliceToSlice takes a slice and a projection function and applies this function to each element of the slice.
+// It returns a new slice containing the results of the projection.
+// The original slice is not modified.
+// If the projection function is nil, it returns nil.
+func ProjectSliceToSlice[X any, Y any](src []X, project func(X) Y) []Y {
 	if project == nil {
 		return nil
 	}
 	res := make([]Y, len(src))
 	for i, x := range src {
 		res[i] = project(x)
+	}
+	return res
+}
+
+// ProjectSliceToMap takes a slice and a projection function and applies this function to each element of the slice.
+// It returns a new map containing the results of the projection.
+// The original slice is not modified.
+// Note that the resulting map may be smaller if the projection function does not guarantee unique keys.
+// If the projection function is nil, it returns nil.
+func ProjectSliceToMap[X any, K comparable, V any](src []X, project func(X) (K, V)) map[K]V {
+	if project == nil {
+		return nil
+	}
+	res := make(map[K]V, len(src))
+	for _, x := range src {
+		k, v := project(x)
+		res[k] = v
 	}
 	return res
 }
