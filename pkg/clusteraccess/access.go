@@ -344,6 +344,147 @@ func ComputeTokenRenewalTimeWithRatio(creationTime, expirationTime time.Time, ra
 	return renewalAt
 }
 
+// CreateOIDCKubeconfig creates a kubeconfig that uses the oidc-login plugin for authentication.
+// The 'user' arg is used as key for the auth configuration and can be chosen freely.
+// Note that this kubeconfig is meant for human users, controllers can usually not execute 'kubectl oidc-login get-token'.
+func CreateOIDCKubeconfig(user, host string, caData []byte, issuer, clientID string, extraOptions ...CreateOIDCKubeconfigOption) ([]byte, error) {
+	opts := &CreateOIDCKubeconfigOptions{
+		User:     user,
+		Host:     host,
+		CAData:   caData,
+		Issuer:   issuer,
+		ClientID: clientID,
+	}
+
+	for _, apply := range extraOptions {
+		apply(opts)
+	}
+
+	return createOIDCKubeconfig(opts)
+}
+
+func createOIDCKubeconfig(opts *CreateOIDCKubeconfigOptions) ([]byte, error) {
+	grantType := opts.GrantType
+	if grantType == "" {
+		grantType = GrantTypeAuto
+	}
+	exec := &clientcmdapi.ExecConfig{
+		APIVersion: "client.authentication.k8s.io/v1beta1",
+		Command:    "kubectl",
+		Args: []string{
+			"oidc-login",
+			"get-token",
+			"--grant-type=" + string(grantType),
+			"--oidc-issuer-url=" + opts.Issuer,
+			"--oidc-client-id=" + opts.ClientID,
+		},
+	}
+	if opts.ClientSecret != "" {
+		exec.Args = append(exec.Args, "--oidc-client-secret="+opts.ClientSecret)
+	}
+	for _, extraScope := range opts.ExtraScopes {
+		exec.Args = append(exec.Args, "--oidc-extra-scope="+extraScope)
+	}
+	if opts.UsePKCE {
+		exec.Args = append(exec.Args, "--oidc-use-pkce")
+	}
+	if opts.ForceRefresh {
+		exec.Args = append(exec.Args, "--force-refresh")
+	}
+
+	id := "cluster"
+	kcfg := clientcmdapi.Config{
+		APIVersion: "v1",
+		Kind:       "Config",
+		Clusters: map[string]*clientcmdapi.Cluster{
+			id: {
+				Server:                   opts.Host,
+				CertificateAuthorityData: opts.CAData,
+			},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			id: {
+				Cluster:  id,
+				AuthInfo: opts.User,
+			},
+		},
+		CurrentContext: id,
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			opts.User: {
+				Exec: exec,
+			},
+		},
+	}
+
+	kcfgBytes, err := clientcmd.Write(kcfg)
+	if err != nil {
+		return nil, fmt.Errorf("error converting converting generated kubeconfig into yaml: %w", err)
+	}
+	return kcfgBytes, nil
+}
+
+type CreateOIDCKubeconfigOptions struct {
+	User         string
+	Host         string
+	CAData       []byte
+	Issuer       string
+	ClientID     string
+	ClientSecret string
+	ExtraScopes  []string
+	UsePKCE      bool
+	ForceRefresh bool
+	GrantType    OIDCGrantType
+}
+
+type OIDCGrantType string
+
+const (
+	GrantTypeAuto             OIDCGrantType = "auto"
+	GrantTypeAuthCode         OIDCGrantType = "authcode"
+	GrantTypeAuthCodeKeyboard OIDCGrantType = "authcode-keyboard"
+	GrantTypePassword         OIDCGrantType = "password"
+	GrantTypeDeviceCode       OIDCGrantType = "device-code"
+)
+
+type CreateOIDCKubeconfigOption func(*CreateOIDCKubeconfigOptions)
+
+// WithExtraScope is an option for CreateOIDCKubeconfig that adds an extra scope to the oidc-login subcommand.
+// This option can be used multiple times to add multiple scopes.
+func WithExtraScope(scope string) CreateOIDCKubeconfigOption {
+	return func(opts *CreateOIDCKubeconfigOptions) {
+		opts.ExtraScopes = append(opts.ExtraScopes, scope)
+	}
+}
+
+// UsePKCE is an option for CreateOIDCKubeconfig that enforces the use of PKCE.
+func UsePKCE() CreateOIDCKubeconfigOption {
+	return func(opts *CreateOIDCKubeconfigOptions) {
+		opts.UsePKCE = true
+	}
+}
+
+// ForceRefresh is an option for CreateOIDCKubeconfig that forces the refresh of the token, independent of its expiration time.
+func ForceRefresh() CreateOIDCKubeconfigOption {
+	return func(opts *CreateOIDCKubeconfigOptions) {
+		opts.ForceRefresh = true
+	}
+}
+
+// WithGrantType is an option for CreateOIDCKubeconfig that sets the grant type.
+// Valid values are "auto", "authcode", "authcode-keyboard", "password", and "device-code".
+func WithGrantType(grantType OIDCGrantType) CreateOIDCKubeconfigOption {
+	return func(opts *CreateOIDCKubeconfigOptions) {
+		opts.GrantType = grantType
+	}
+}
+
+// WithClientSecret is an option for CreateOIDCKubeconfig that sets the client secret.
+func WithClientSecret(clientSecret string) CreateOIDCKubeconfigOption {
+	return func(opts *CreateOIDCKubeconfigOptions) {
+		opts.ClientSecret = clientSecret
+	}
+}
+
 // oidcTrustConfig represents the configuration for an OIDC trust relationship.
 // It includes the host of the Kubernetes API server, CA data for TLS verification,
 // and the audience for the OIDC tokens.
