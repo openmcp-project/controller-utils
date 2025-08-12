@@ -490,24 +490,27 @@ var _ = Describe("ClusterAccess", func() {
 		})
 
 		It("should create a kubeconfig with oidc-login plugin (all options)", func() {
+			contextId := "my-context"
+			clusterId := "my-cluster"
 			kcfgBytes, err := clusteraccess.CreateOIDCKubeconfig("testuser", "https://api.example.com", []byte("test-ca"), "https://example.com/oidc", "test-client-id",
 				clusteraccess.WithExtraScope("foo"),
 				clusteraccess.WithExtraScope("bar"),
 				clusteraccess.UsePKCE(),
 				clusteraccess.ForceRefresh(),
 				clusteraccess.WithClientSecret("test-client-secret"),
-				clusteraccess.WithGrantType(clusteraccess.GrantTypePassword))
+				clusteraccess.WithGrantType(clusteraccess.GrantTypePassword),
+				clusteraccess.WithContextName(contextId),
+				clusteraccess.WithClusterName(clusterId))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(kcfgBytes).ToNot(BeEmpty())
 
 			kcfg, err := clientcmd.Load(kcfgBytes)
 			Expect(err).ToNot(HaveOccurred())
-			id := "cluster"
-			Expect(kcfg.CurrentContext).To(Equal(id))
-			Expect(kcfg.Contexts[id].Cluster).To(Equal(id))
-			Expect(kcfg.Contexts[id].AuthInfo).To(Equal("testuser"))
-			Expect(kcfg.Clusters[id].Server).To(Equal("https://api.example.com"))
-			Expect(kcfg.Clusters[id].CertificateAuthorityData).To(Equal([]byte("test-ca")))
+			Expect(kcfg.CurrentContext).To(Equal(contextId))
+			Expect(kcfg.Contexts[contextId].Cluster).To(Equal(clusterId))
+			Expect(kcfg.Contexts[contextId].AuthInfo).To(Equal("testuser"))
+			Expect(kcfg.Clusters[clusterId].Server).To(Equal("https://api.example.com"))
+			Expect(kcfg.Clusters[clusterId].CertificateAuthorityData).To(Equal([]byte("test-ca")))
 			auth := kcfg.AuthInfos["testuser"]
 			Expect(auth).ToNot(BeNil())
 			Expect(auth.Exec).ToNot(BeNil())

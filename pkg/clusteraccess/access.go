@@ -349,11 +349,13 @@ func ComputeTokenRenewalTimeWithRatio(creationTime, expirationTime time.Time, ra
 // Note that this kubeconfig is meant for human users, controllers can usually not execute 'kubectl oidc-login get-token'.
 func CreateOIDCKubeconfig(user, host string, caData []byte, issuer, clientID string, extraOptions ...CreateOIDCKubeconfigOption) ([]byte, error) {
 	opts := &CreateOIDCKubeconfigOptions{
-		User:     user,
-		Host:     host,
-		CAData:   caData,
-		Issuer:   issuer,
-		ClientID: clientID,
+		User:        user,
+		Host:        host,
+		CAData:      caData,
+		Issuer:      issuer,
+		ClientID:    clientID,
+		ContextName: "cluster",
+		ClusterName: "cluster",
 	}
 
 	for _, apply := range extraOptions {
@@ -392,23 +394,22 @@ func createOIDCKubeconfig(opts *CreateOIDCKubeconfigOptions) ([]byte, error) {
 		exec.Args = append(exec.Args, "--force-refresh")
 	}
 
-	id := "cluster"
 	kcfg := clientcmdapi.Config{
 		APIVersion: "v1",
 		Kind:       "Config",
 		Clusters: map[string]*clientcmdapi.Cluster{
-			id: {
+			opts.ClusterName: {
 				Server:                   opts.Host,
 				CertificateAuthorityData: opts.CAData,
 			},
 		},
 		Contexts: map[string]*clientcmdapi.Context{
-			id: {
-				Cluster:  id,
+			opts.ContextName: {
+				Cluster:  opts.ClusterName,
 				AuthInfo: opts.User,
 			},
 		},
-		CurrentContext: id,
+		CurrentContext: opts.ContextName,
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			opts.User: {
 				Exec: exec,
@@ -424,6 +425,8 @@ func createOIDCKubeconfig(opts *CreateOIDCKubeconfigOptions) ([]byte, error) {
 }
 
 type CreateOIDCKubeconfigOptions struct {
+	ContextName  string
+	ClusterName  string
 	User         string
 	Host         string
 	CAData       []byte
@@ -482,6 +485,26 @@ func WithGrantType(grantType OIDCGrantType) CreateOIDCKubeconfigOption {
 func WithClientSecret(clientSecret string) CreateOIDCKubeconfigOption {
 	return func(opts *CreateOIDCKubeconfigOptions) {
 		opts.ClientSecret = clientSecret
+	}
+}
+
+// WithContextName allows to override the default context name "cluster" in the kubeconfig.
+func WithContextName(contextName string) CreateOIDCKubeconfigOption {
+	return func(opts *CreateOIDCKubeconfigOptions) {
+		opts.ContextName = contextName
+		if opts.ContextName == "" {
+			opts.ContextName = "cluster"
+		}
+	}
+}
+
+// WithClusterName allows to override the default cluster name "cluster" in the kubeconfig.
+func WithClusterName(clusterName string) CreateOIDCKubeconfigOption {
+	return func(opts *CreateOIDCKubeconfigOptions) {
+		opts.ClusterName = clusterName
+		if opts.ClusterName == "" {
+			opts.ClusterName = "cluster"
+		}
 	}
 }
 
