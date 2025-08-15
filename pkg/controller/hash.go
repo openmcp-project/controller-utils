@@ -61,6 +61,16 @@ func validateIDs(names []string) error {
 	return ErrInvalidNames
 }
 
+// K8sNameUUIDUnsafe works like K8sNameUUID, but panics instead of returning an error.
+// This should only be used in places where the input is guaranteed to be valid.
+func K8sNameUUIDUnsafe(names ...string) string {
+	uuid, err := K8sNameUUID(names...)
+	if err != nil {
+		panic(err)
+	}
+	return uuid
+}
+
 // K8sObjectUUID takes a client object and computes a hash out of the namespace and name, which is then formatted as a version 8 UUID.
 // An empty namespace will be replaced by "default".
 func K8sObjectUUID(obj client.Object) (string, error) {
@@ -69,4 +79,14 @@ func K8sObjectUUID(obj client.Object) (string, error) {
 		namespace = corev1.NamespaceDefault
 	}
 	return K8sNameUUID(namespace, name)
+}
+
+// K8sObjectUUIDUnsafe works like K8sObjectUUID, but panics instead of returning an error.
+// This should only be used in places where the input is guaranteed to be valid.
+func K8sObjectUUIDUnsafe(obj client.Object) string {
+	uuid, err := K8sObjectUUID(obj)
+	if err != nil {
+		panic(err)
+	}
+	return uuid
 }
