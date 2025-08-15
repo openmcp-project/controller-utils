@@ -1,0 +1,72 @@
+package controller
+
+import (
+	"crypto/sha3"
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/google/uuid"
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+var (
+	ErrInvalidNames = errors.New("list of names must not be empty and contain at least one non-empty string")
+)
+
+// Version8UUID creates a new UUID (version 8) from a byte slice. Returns an error if the slice does not have a length of 16. The bytes are copied from the slice.
+// The bits 48-51 and 64-65 are modified to make the output recognizable as a version 8 UUID, so only 122 out of 128 bits from the input data will be kept.
+func Version8UUID(data []byte) (uuid.UUID, error) {
+	if len(data) != 16 {
+		return uuid.Nil, fmt.Errorf("invalid data (got %d bytes)", len(data))
+	}
+
+	dataCopy := make([]byte, len(data))
+	copy(dataCopy, data)
+
+	// Set 4-bit version field (ver = 0b1000)
+	dataCopy[6] &= 0b00001111
+	dataCopy[6] |= 0b10000000
+
+	// Set 2-bit variant field (var = 0b10)
+	dataCopy[8] &= 0b00111111
+	dataCopy[8] |= 0b10000000
+
+	return uuid.FromBytes(dataCopy)
+}
+
+// K8sNameUUID takes any number of string arguments and computes a hash out of it, which is then formatted as a version 8 UUID.
+// The arguments are joined with '/' before being hashed.
+// Returns an error if the list of ids is empty or contains only empty strings.
+func K8sNameUUID(names ...string) (string, error) {
+	if err := validateIDs(names); err != nil {
+		return "", err
+	}
+
+	name := strings.Join(names, "/")
+	hash := sha3.SumSHAKE128([]byte(name), 16)
+	u, err := Version8UUID(hash)
+
+	return u.String(), err
+}
+
+func validateIDs(names []string) error {
+	for _, name := range names {
+		// at least one non-empty string found
+		if name != "" {
+			return nil
+		}
+	}
+	return ErrInvalidNames
+}
+
+// K8sObjectUUID takes a client object and computes a hash out of the namespace and name, which is then formatted as a version 8 UUID.
+// An empty namespace will be replaced by "default".
+func K8sObjectUUID(obj client.Object) (string, error) {
+	name, namespace := obj.GetName(), obj.GetNamespace()
+	if namespace == "" {
+		namespace = corev1.NamespaceDefault
+	}
+	return K8sNameUUID(namespace, name)
+}
