@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/onsi/ginkgo/v2 v2.25.1
 	github.com/onsi/gomega v1.38.1
-	github.com/openmcp-project/controller-utils/api v0.17.0
+	github.com/openmcp-project/controller-utils/api v0.18.0
 	github.com/spf13/pflag v1.0.7
 	github.com/stretchr/testify v1.11.0
 	go.uber.org/zap v1.27.0
