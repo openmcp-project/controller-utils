@@ -39,6 +39,10 @@ func (m *CRDManager) AddCRDLabelToClusterMapping(labelValue string, cluster *clu
 	m.crdLabelsToClusterMappings[labelValue] = cluster
 }
 
+func (m *CRDManager) SkipCRDsWithClusterLabel(labelValue string) {
+	m.crdLabelsToClusterMappings[labelValue] = nil
+}
+
 func (m *CRDManager) CreateOrUpdateCRDs(ctx context.Context, log *logging.Logger) error {
 	crds, err := m.crdList()
 	if err != nil {
@@ -48,14 +52,20 @@ func (m *CRDManager) CreateOrUpdateCRDs(ctx context.Context, log *logging.Logger
 	var errs error
 
 	for _, crd := range crds {
-		c, err := m.getClusterForCRD(crd)
+		c, cLabel, err := m.getClusterForCRD(crd)
 		if err != nil {
 			errs = errors.Join(errs, err)
 			continue
 		}
 
+		if c == nil {
+			if log != nil {
+				log.Info("Skipping CRD because the assigned cluster is nil", "name", crd.Name, "clusterLabel", cLabel)
+			}
+			continue
+		}
 		if log != nil {
-			log.Info("creating/updating CRD", "name", crd.Name, "cluster", c.ID())
+			log.Info("Creating/updating CRD", "name", crd.Name, "cluster", c.ID())
 		}
 		m := resources.NewCRDMutator(crd)
 		m.MetadataMutator().WithLabels(crd.Labels).WithAnnotations(crd.Annotations)
@@ -69,18 +79,18 @@ func (m *CRDManager) CreateOrUpdateCRDs(ctx context.Context, log *logging.Logger
 	return nil
 }
 
-func (m *CRDManager) getClusterForCRD(crd *apiextv1.CustomResourceDefinition) (*clusters.Cluster, error) {
+func (m *CRDManager) getClusterForCRD(crd *apiextv1.CustomResourceDefinition) (*clusters.Cluster, string, error) {
 	labelValue, ok := controller.GetLabel(crd, m.mappingLabelName)
 	if !ok {
-		return nil, fmt.Errorf("missing label '%s' for CRD '%s'", m.mappingLabelName, crd.Name)
+		return nil, "", fmt.Errorf("missing label '%s' for CRD '%s'", m.mappingLabelName, crd.Name)
 	}
 
 	cluster, ok := m.crdLabelsToClusterMappings[labelValue]
 	if !ok {
-		return nil, fmt.Errorf("no cluster mapping found for label value '%s' in CRD '%s'", labelValue, crd.Name)
+		return nil, labelValue, fmt.Errorf("no cluster mapping found for label value '%s' in CRD '%s'", labelValue, crd.Name)
 	}
 
-	return cluster, nil
+	return cluster, labelValue, nil
 }
 
 // CRDsFromFileSystem reads CRDs from the specified filesystem path.

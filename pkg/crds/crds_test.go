@@ -31,7 +31,7 @@ var _ = Describe("CRDsFromFileSystem", func() {
 		crdPath := "testdata"
 		crdsList, err := crds.CRDsFromFileSystem(testFS, crdPath)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(crdsList).To(HaveLen(2))
+		Expect(crdsList).To(HaveLen(3))
 
 		// Validate the first CRD
 		Expect(crdsList[0].Name).To(Equal("testresources.example.com"))
@@ -68,6 +68,11 @@ var _ = Describe("CRDManager", func() {
 		crdManager.AddCRDLabelToClusterMapping("cluster_b", clusterB)
 
 		ctx := context.Background()
+
+		// CRD creation should fail due to unknown cluster label
+		Expect(crdManager.CreateOrUpdateCRDs(ctx, nil)).To(HaveOccurred())
+
+		crdManager.SkipCRDsWithClusterLabel("cluster_c")
 
 		err = crdManager.CreateOrUpdateCRDs(ctx, nil)
 		Expect(err).NotTo(HaveOccurred())
