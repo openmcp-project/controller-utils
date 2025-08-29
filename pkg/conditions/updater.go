@@ -90,7 +90,8 @@ func (c *conditionUpdater) WithEventRecorder(recorder record.EventRecorder, verb
 func (c *conditionUpdater) UpdateCondition(conType string, status metav1.ConditionStatus, observedGeneration int64, reason, message string) *conditionUpdater {
 	if reason == "" {
 		// the metav1.Condition type requires a reason, so let's add a dummy if none is given
-		reason = conType + string(status)
+		// the type field allows dots ('.'), while the reason field does not, so replace them with colons (':') (which are not allowed in the type field)
+		reason = strings.ReplaceAll(conType, ".", ":") + "_" + string(status)
 	}
 	con := metav1.Condition{
 		Type:               conType,
