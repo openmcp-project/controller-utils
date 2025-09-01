@@ -223,6 +223,26 @@ var _ = Describe("Conditions", func() {
 			Expect(updater.HasCondition("true")).To(BeTrue())
 		})
 
+		It("should correctly add a reason if not given and replace invalid characters from the type", func() {
+			cons := []metav1.Condition{}
+			updated, _ := conditions.ConditionUpdater(cons, false).
+				UpdateCondition("TestCondition", conditions.FromBool(true), 0, "", "").
+				UpdateCondition("TestCondition.Test", conditions.FromBool(false), 0, "", "").
+				Conditions()
+			Expect(updated).To(ConsistOf(
+				MatchCondition(TestCondition().
+					WithType("TestCondition").
+					WithStatus(metav1.ConditionTrue).
+					WithReason("TestCondition_True").
+					WithMessage("")),
+				MatchCondition(TestCondition().
+					WithType("TestCondition.Test").
+					WithStatus(metav1.ConditionFalse).
+					WithReason("TestCondition:Test_False").
+					WithMessage("")),
+			))
+		})
+
 	})
 
 	Context("EventRecorder", func() {
