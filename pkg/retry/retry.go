@@ -278,6 +278,15 @@ func (rc *Client) List(ctx context.Context, list client.ObjectList, opts ...clie
 	return
 }
 
+// Apply wraps the client's Apply method and retries it on failure.
+func (rc *Client) Apply(ctx context.Context, obj runtime.ApplyConfiguration, opts ...client.ApplyOption) (err error) {
+	rc.retry(ctx, func(ctx context.Context) error {
+		err = rc.internal.Apply(ctx, obj, opts...)
+		return err
+	})
+	return
+}
+
 // Patch wraps the client's Patch method and retries it on failure.
 func (rc *Client) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) (err error) {
 	rc.retry(ctx, func(ctx context.Context) error {
