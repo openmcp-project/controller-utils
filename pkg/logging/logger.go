@@ -87,7 +87,7 @@ func ParseLogFormat(raw string) (LogFormat, error) {
 // Enabled tests whether logging at the provided level is enabled.
 // This deviates from the logr Enabled() function, which doesn't take an argument.
 func (l Logger) Enabled(lvl LogLevel) bool {
-	return l.internal.GetSink() != nil && l.internal.GetSink().Enabled(levelToVerbosity(lvl))
+	return l.internal.GetSink() != nil && l.internal.GetSink().Enabled(LevelToVerbosity(lvl))
 }
 
 // Info logs a non-error message with the given key/value pairs as context.
@@ -97,7 +97,7 @@ func (l Logger) Enabled(lvl LogLevel) bool {
 // variable information.  The key/value pairs should alternate string
 // keys and arbitrary values.
 func (l Logger) Info(msg string, keysAndValues ...interface{}) {
-	l.internal.V(levelToVerbosity(INFO)).Info(msg, keysAndValues...)
+	l.internal.V(LevelToVerbosity(INFO)).Info(msg, keysAndValues...)
 }
 
 // Error logs an error, with the given message and key/value pairs as context.
@@ -215,7 +215,7 @@ func NewContextWithDiscard(ctx context.Context) context.Context {
 
 // Debug logs a message at DEBUG level.
 func (l Logger) Debug(msg string, keysAndValues ...interface{}) {
-	l.internal.V(levelToVerbosity(DEBUG)).Info(msg, keysAndValues...)
+	l.internal.V(LevelToVerbosity(DEBUG)).Info(msg, keysAndValues...)
 }
 
 // Log logs at the given log level. It can be used to log at dynamically determined levels.
