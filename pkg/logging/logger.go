@@ -8,8 +8,10 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type Logger struct {
@@ -251,4 +253,20 @@ func (l Logger) WithNameAndContext(ctx context.Context, name string) (Logger, co
 	log := l.WithName(name)
 	ctx = NewContext(ctx, log)
 	return log, ctx
+}
+
+// LogRequeue takes a reconcile.Result and prints a log message on the desired verbosity if the result indicates a requeue.
+// Logs at debug level, unless another verbosity is provided. Any but the first verbosity argument is ignored.
+// No message is logged if no requeue is specified in the reconcile.Result.
+// Returns the provided reconcile.Result unchanged.
+func (l Logger) LogRequeue(rr reconcile.Result, verbosity ...LogLevel) reconcile.Result {
+	if rr.RequeueAfter > 0 {
+		v := DEBUG
+		if len(verbosity) > 0 {
+			v = verbosity[0]
+		}
+		nextRequeueTime := time.Now().Add(rr.RequeueAfter)
+		l.Log(v, "Requeuing object for reconciliation", "after", rr.RequeueAfter.String(), "at", nextRequeueTime.Format(time.RFC3339))
+	}
+	return rr
 }
