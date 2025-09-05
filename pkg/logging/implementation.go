@@ -132,7 +132,9 @@ func determineZapConfig(loggerConfig *Config) zap.Config {
 	return zapConfig
 }
 
-func levelToVerbosity(level LogLevel) int {
+// LevelToVerbosity converts the given LogLevel to a verbosity level understood by zapr.
+// Unknown LogLevels are silently treated as INFO.
+func LevelToVerbosity(level LogLevel) int {
 	var res int
 	switch level {
 	case DEBUG:
