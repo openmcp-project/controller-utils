@@ -8,8 +8,10 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 type Logger struct {
@@ -85,7 +87,7 @@ func ParseLogFormat(raw string) (LogFormat, error) {
 // Enabled tests whether logging at the provided level is enabled.
 // This deviates from the logr Enabled() function, which doesn't take an argument.
 func (l Logger) Enabled(lvl LogLevel) bool {
-	return l.internal.GetSink() != nil && l.internal.GetSink().Enabled(levelToVerbosity(lvl))
+	return l.internal.GetSink() != nil && l.internal.GetSink().Enabled(LevelToVerbosity(lvl))
 }
 
 // Info logs a non-error message with the given key/value pairs as context.
@@ -95,7 +97,7 @@ func (l Logger) Enabled(lvl LogLevel) bool {
 // variable information.  The key/value pairs should alternate string
 // keys and arbitrary values.
 func (l Logger) Info(msg string, keysAndValues ...interface{}) {
-	l.internal.V(levelToVerbosity(INFO)).Info(msg, keysAndValues...)
+	l.internal.V(LevelToVerbosity(INFO)).Info(msg, keysAndValues...)
 }
 
 // Error logs an error, with the given message and key/value pairs as context.
@@ -213,7 +215,7 @@ func NewContextWithDiscard(ctx context.Context) context.Context {
 
 // Debug logs a message at DEBUG level.
 func (l Logger) Debug(msg string, keysAndValues ...interface{}) {
-	l.internal.V(levelToVerbosity(DEBUG)).Info(msg, keysAndValues...)
+	l.internal.V(LevelToVerbosity(DEBUG)).Info(msg, keysAndValues...)
 }
 
 // Log logs at the given log level. It can be used to log at dynamically determined levels.
@@ -251,4 +253,20 @@ func (l Logger) WithNameAndContext(ctx context.Context, name string) (Logger, co
 	log := l.WithName(name)
 	ctx = NewContext(ctx, log)
 	return log, ctx
+}
+
+// LogRequeue takes a reconcile.Result and prints a log message on the desired verbosity if the result indicates a requeue.
+// Logs at debug level, unless another verbosity is provided. Any but the first verbosity argument is ignored.
+// No message is logged if no requeue is specified in the reconcile.Result.
+// Returns the provided reconcile.Result unchanged.
+func (l Logger) LogRequeue(rr reconcile.Result, verbosity ...LogLevel) reconcile.Result {
+	if rr.RequeueAfter > 0 {
+		v := DEBUG
+		if len(verbosity) > 0 {
+			v = verbosity[0]
+		}
+		nextRequeueTime := time.Now().Add(rr.RequeueAfter)
+		l.Log(v, "Requeuing object for reconciliation", "after", rr.RequeueAfter.String(), "at", nextRequeueTime.Format(time.RFC3339))
+	}
+	return rr
 }
