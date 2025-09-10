@@ -92,7 +92,7 @@ func K8sObjectUUIDUnsafe(obj client.Object) string {
 	return uuid
 }
 
-// NameHashSHAKE128Base32 takes any number of string arguments and computes a hash out of it. The length of the output will be 8.
+// NameHashSHAKE128Base32 takes any number of string arguments and computes a hash out of it. The output string will be 8 characters long.
 // The arguments are joined with '/' before being hashed.
 func NameHashSHAKE128Base32(names ...string) string {
 	name := strings.Join(names, "/")
@@ -104,7 +104,7 @@ func NameHashSHAKE128Base32(names ...string) string {
 	return base32.NewEncoding(Base32EncodeStdLowerCase).WithPadding(base32.NoPadding).EncodeToString(hash)
 }
 
-// ObjectHashSHAKE128Base32 takes a client object and computes a hash out of the namespace and name. The length of the output will be 8.
+// ObjectHashSHAKE128Base32 takes a client object and computes a hash out of the namespace and name. The output string will be 8 characters long.
 // An empty namespace will be replaced by "default".
 func ObjectHashSHAKE128Base32(obj client.Object) string {
 	name, namespace := obj.GetName(), obj.GetNamespace()
