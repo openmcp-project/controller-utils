@@ -2,6 +2,7 @@ package controller
 
 import (
 	"crypto/sha3"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -129,6 +130,62 @@ func Test_K8sObjectUUID(t *testing.T) {
 			actual, err := K8sObjectUUID(tC.obj)
 			assert.NoError(t, err)
 			assert.Equal(t, tC.expectedUUID, actual)
+		})
+	}
+}
+
+func Test_NameHashSHAKE128Base32(t *testing.T) {
+	testCases := []struct {
+		input    []string
+		expected string
+	}{
+		{
+			input:    []string{"example"},
+			expected: "epgccknc",
+		},
+		{
+			input:    []string{corev1.NamespaceDefault, "example"},
+			expected: "fphxsdub",
+		},
+	}
+	for _, tC := range testCases {
+		t.Run(strings.Join(tC.input, " "), func(t *testing.T) {
+			actual := NameHashSHAKE128Base32(tC.input...)
+			assert.Equal(t, tC.expected, actual)
+		})
+	}
+}
+
+func Test_ObjectHashSHAKE128Base32(t *testing.T) {
+	testCases := []struct {
+		desc     string
+		obj      client.Object
+		expected string
+	}{
+		{
+			desc: "should work with config map",
+			obj: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "example",
+					Namespace: "default",
+				},
+			},
+			expected: "fphxsdub", // same as in Test_K8sNameUUID
+		},
+		{
+			desc: "should work with config map and empty namespace",
+			obj: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "example",
+				},
+			},
+			expected: "fphxsdub", // same as above
+		},
+	}
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			actual := ObjectHashSHAKE128Base32(tC.obj)
+			assert.Equal(t, tC.expected, actual)
 		})
 	}
 }
