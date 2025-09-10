@@ -98,7 +98,7 @@ func NameHashSHAKE128Base32(names ...string) string {
 	name := strings.Join(names, "/")
 
 	// Desired output length = 8 chars
-	// 8 chars * 5 bit (base32) / 8 bit per byte = 5 byte
+	// 8 chars * 5 bits (base32) / 8 bits per byte = 5 bytes
 	hash := sha3.SumSHAKE128([]byte(name), 5)
 
 	return base32.NewEncoding(Base32EncodeStdLowerCase).WithPadding(base32.NoPadding).EncodeToString(hash)
