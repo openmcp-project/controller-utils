@@ -41,7 +41,7 @@ func version8UUID(data []byte) (uuid.UUID, error) {
 // K8sNameUUID takes any number of string arguments and computes a hash out of it, which is then formatted as a version 8 UUID.
 // The arguments are joined with '/' before being hashed.
 // Returns an error if the list of ids is empty or contains only empty strings.
-// Deprecated: Use ObjectHashSHAKE128Base32 instead.
+// Deprecated: Use NameHashSHAKE128Base32 instead.
 func K8sNameUUID(names ...string) (string, error) {
 	if err := validateIDs(names); err != nil {
 		return "", err
