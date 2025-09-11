@@ -13,7 +13,8 @@ import (
 )
 
 var (
-	ErrInvalidNames = errors.New("list of names must not be empty and contain at least one non-empty string")
+	ErrInvalidNames   = errors.New("list of names must not be empty and contain at least one non-empty string")
+	ErrMaxLenTooSmall = errors.New("maxLen must be greater than 10")
 )
 
 // Version8UUID creates a new UUID (version 8) from a byte slice. Returns an error if the slice does not have a length of 16. The bytes are copied from the slice.
@@ -64,6 +65,7 @@ func validateIDs(names []string) error {
 
 // K8sNameUUIDUnsafe works like K8sNameUUID, but panics instead of returning an error.
 // This should only be used in places where the input is guaranteed to be valid.
+// Deprecated: Use NameHashSHAKE128Base32 instead.
 func K8sNameUUIDUnsafe(names ...string) string {
 	uuid, err := K8sNameUUID(names...)
 	if err != nil {
@@ -74,6 +76,7 @@ func K8sNameUUIDUnsafe(names ...string) string {
 
 // K8sObjectUUID takes a client object and computes a hash out of the namespace and name, which is then formatted as a version 8 UUID.
 // An empty namespace will be replaced by "default".
+// Deprecated: Use ObjectHashSHAKE128Base32 instead.
 func K8sObjectUUID(obj client.Object) (string, error) {
 	name, namespace := obj.GetName(), obj.GetNamespace()
 	if namespace == "" {
@@ -84,6 +87,7 @@ func K8sObjectUUID(obj client.Object) (string, error) {
 
 // K8sObjectUUIDUnsafe works like K8sObjectUUID, but panics instead of returning an error.
 // This should only be used in places where the input is guaranteed to be valid.
+// Deprecated: Use ObjectHashSHAKE128Base32 instead.
 func K8sObjectUUIDUnsafe(obj client.Object) string {
 	uuid, err := K8sObjectUUID(obj)
 	if err != nil {
@@ -112,4 +116,22 @@ func ObjectHashSHAKE128Base32(obj client.Object) string {
 		namespace = corev1.NamespaceDefault
 	}
 	return NameHashSHAKE128Base32(namespace, name)
+}
+
+// ShortenToXCharacters shortens the input string if it exceeds maxLen.
+// It uses NameHashSHAKE128Base32 to generate a hash which will replace the last few characters.
+func ShortenToXCharacters(input string, maxLen int) (string, error) {
+	if len(input) <= maxLen {
+		return input, nil
+	}
+
+	hash := NameHashSHAKE128Base32(input)
+	suffix := fmt.Sprintf("--%s", hash)
+	trimLength := maxLen - len(suffix)
+
+	if trimLength <= 0 {
+		return "", ErrMaxLenTooSmall
+	}
+
+	return input[:trimLength] + suffix, nil
 }

@@ -189,3 +189,49 @@ func Test_ObjectHashSHAKE128Base32(t *testing.T) {
 		})
 	}
 }
+
+func Test_ShortenToXCharacters(t *testing.T) {
+	testCases := []struct {
+		desc        string
+		input       string
+		maxLen      int
+		expected    string
+		expectedErr error
+	}{
+		{
+			desc:     "short string",
+			input:    "short",
+			expected: "short",
+			maxLen:   100,
+		},
+		{
+			desc:     "short string to trim",
+			input:    "short1234567",
+			expected: "s--j5gore3p",
+			maxLen:   11,
+		},
+		{
+			desc:        "maxLen too small",
+			input:       "shorter1234",
+			maxLen:      10,
+			expectedErr: ErrMaxLenTooSmall,
+		},
+		{
+			desc:     "long string",
+			input:    "this-is-a-very-a-very-a-very-long-string-that-is-over-63-characters",
+			expected: "this-is-a-very-a-very-a-very-long-string-that-is-over--6reoyp5o",
+			maxLen:   63,
+		},
+	}
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			actual, err := ShortenToXCharacters(tC.input, tC.maxLen)
+			if tC.expectedErr == nil {
+				assert.Equal(t, tC.expected, actual)
+				assert.LessOrEqual(t, len(actual), tC.maxLen)
+			} else {
+				assert.Equal(t, tC.expectedErr, err)
+			}
+		})
+	}
+}
