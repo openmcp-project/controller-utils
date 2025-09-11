@@ -2,6 +2,7 @@ package controller
 
 import (
 	"crypto/sha3"
+	"encoding/base32"
 	"errors"
 	"fmt"
 	"strings"
@@ -89,4 +90,26 @@ func K8sObjectUUIDUnsafe(obj client.Object) string {
 		panic(err)
 	}
 	return uuid
+}
+
+// NameHashSHAKE128Base32 takes any number of string arguments and computes a hash out of it. The output string will be 8 characters long.
+// The arguments are joined with '/' before being hashed.
+func NameHashSHAKE128Base32(names ...string) string {
+	name := strings.Join(names, "/")
+
+	// Desired output length = 8 chars
+	// 8 chars * 5 bits (base32) / 8 bits per byte = 5 bytes
+	hash := sha3.SumSHAKE128([]byte(name), 5)
+
+	return base32.NewEncoding(Base32EncodeStdLowerCase).WithPadding(base32.NoPadding).EncodeToString(hash)
+}
+
+// ObjectHashSHAKE128Base32 takes a client object and computes a hash out of the namespace and name. The output string will be 8 characters long.
+// An empty namespace will be replaced by "default".
+func ObjectHashSHAKE128Base32(obj client.Object) string {
+	name, namespace := obj.GetName(), obj.GetNamespace()
+	if namespace == "" {
+		namespace = corev1.NamespaceDefault
+	}
+	return NameHashSHAKE128Base32(namespace, name)
 }
