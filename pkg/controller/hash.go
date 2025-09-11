@@ -17,9 +17,9 @@ var (
 	ErrMaxLenTooSmall = errors.New("maxLen must be greater than 10")
 )
 
-// Version8UUID creates a new UUID (version 8) from a byte slice. Returns an error if the slice does not have a length of 16. The bytes are copied from the slice.
+// version8UUID creates a new UUID (version 8) from a byte slice. Returns an error if the slice does not have a length of 16. The bytes are copied from the slice.
 // The bits 48-51 and 64-65 are modified to make the output recognizable as a version 8 UUID, so only 122 out of 128 bits from the input data will be kept.
-func Version8UUID(data []byte) (uuid.UUID, error) {
+func version8UUID(data []byte) (uuid.UUID, error) {
 	if len(data) != 16 {
 		return uuid.Nil, fmt.Errorf("invalid data (got %d bytes)", len(data))
 	}
@@ -41,6 +41,7 @@ func Version8UUID(data []byte) (uuid.UUID, error) {
 // K8sNameUUID takes any number of string arguments and computes a hash out of it, which is then formatted as a version 8 UUID.
 // The arguments are joined with '/' before being hashed.
 // Returns an error if the list of ids is empty or contains only empty strings.
+// Deprecated: Use ObjectHashSHAKE128Base32 instead.
 func K8sNameUUID(names ...string) (string, error) {
 	if err := validateIDs(names); err != nil {
 		return "", err
@@ -48,7 +49,7 @@ func K8sNameUUID(names ...string) (string, error) {
 
 	name := strings.Join(names, "/")
 	hash := sha3.SumSHAKE128([]byte(name), 16)
-	u, err := Version8UUID(hash)
+	u, err := version8UUID(hash)
 
 	return u.String(), err
 }

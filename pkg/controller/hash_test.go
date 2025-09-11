@@ -44,7 +44,7 @@ func Test_Version8UUID(t *testing.T) {
 	}
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
-			u, err := Version8UUID(tC.data)
+			u, err := version8UUID(tC.data)
 			if tC.expectedErr == nil {
 				assert.NoError(t, err)
 				assert.Equal(t, uuid.Version(8), u.Version(), "unexpected version")
