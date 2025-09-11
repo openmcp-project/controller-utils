@@ -15,6 +15,7 @@ const (
 
 // K8sNameHash takes any number of string arguments and computes a hash out of it, which is then base32-encoded to be a valid DNS1123Subdomain k8s resource name
 // The arguments are joined with '/' before being hashed.
+// Deprecated: Use NameHashSHAKE128Base32 instead.
 func K8sNameHash(ids ...string) string {
 	name := strings.Join(ids, "/")
 	// since we are not worried about length-extension attacks (in fact we are not even using hashing for
