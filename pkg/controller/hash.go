@@ -17,6 +17,9 @@ var (
 	ErrMaxLenTooSmall = errors.New("maxLen must be greater than 10")
 )
 
+// K8sMaxNameLength is the maximum length for Kubernetes resource names.
+const K8sMaxNameLength = 63
+
 // version8UUID creates a new UUID (version 8) from a byte slice. Returns an error if the slice does not have a length of 16. The bytes are copied from the slice.
 // The bits 48-51 and 64-65 are modified to make the output recognizable as a version 8 UUID, so only 122 out of 128 bits from the input data will be kept.
 func version8UUID(data []byte) (uuid.UUID, error) {
@@ -135,4 +138,14 @@ func ShortenToXCharacters(input string, maxLen int) (string, error) {
 	}
 
 	return input[:trimLength] + suffix, nil
+}
+
+// ShortenToXCharactersUnsafe works like ShortenToXCharacters, but panics instead of returning an error.
+// This should only be used in places where the input is guaranteed to be valid.
+func ShortenToXCharactersUnsafe(input string, maxLen int) string {
+	result, err := ShortenToXCharacters(input, maxLen)
+	if err != nil {
+		panic(err)
+	}
+	return result
 }
