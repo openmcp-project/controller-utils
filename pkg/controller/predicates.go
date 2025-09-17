@@ -217,3 +217,17 @@ func (p StatusChangedPredicate) Update(e event.UpdateEvent) bool {
 	}
 	return !reflect.DeepEqual(oldStatus, newStatus)
 }
+
+////////////////////////////////////
+/// IDENTITY MATCHING PREDICATES ///
+////////////////////////////////////
+
+// ExactNamePredicate returns true if the object's name and namespace exactly match the specified values.
+func ExactNamePredicate(name, namespace string) predicate.Predicate {
+	return predicate.NewPredicateFuncs(func(obj client.Object) bool {
+		if obj == nil {
+			return false
+		}
+		return obj.GetName() == name && obj.GetNamespace() == namespace
+	})
+}
