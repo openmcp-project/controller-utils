@@ -223,11 +223,12 @@ func (p StatusChangedPredicate) Update(e event.UpdateEvent) bool {
 ////////////////////////////////////
 
 // ExactNamePredicate returns true if the object's name and namespace exactly match the specified values.
+// The namespace can be set to '*' to match any namespace.
 func ExactNamePredicate(name, namespace string) predicate.Predicate {
 	return predicate.NewPredicateFuncs(func(obj client.Object) bool {
 		if obj == nil {
 			return false
 		}
-		return obj.GetName() == name && obj.GetNamespace() == namespace
+		return obj.GetName() == name && (namespace == "*" || obj.GetNamespace() == namespace)
 	})
 }

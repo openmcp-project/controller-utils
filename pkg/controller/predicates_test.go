@@ -246,6 +246,9 @@ var _ = Describe("Predicates", func() {
 
 			p3 := ctrlutils.ExactNamePredicate("foo", "baz")
 			Expect(p3.Create(e)).To(BeFalse())
+
+			p4 := ctrlutils.ExactNamePredicate("foo", "*")
+			Expect(p4.Create(e)).To(BeTrue())
 		})
 
 	})
