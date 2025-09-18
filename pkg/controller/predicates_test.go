@@ -234,6 +234,25 @@ var _ = Describe("Predicates", func() {
 
 	})
 
+	Context("Identity", func() {
+
+		It("should match resources with the specified identity", func() {
+			p := ctrlutils.ExactNamePredicate("foo", "bar")
+			e := event.CreateEvent{Object: base}
+			Expect(p.Create(e)).To(BeTrue())
+
+			p2 := ctrlutils.ExactNamePredicate("foo", "")
+			Expect(p2.Create(e)).To(BeFalse())
+
+			p3 := ctrlutils.ExactNamePredicate("foo", "baz")
+			Expect(p3.Create(e)).To(BeFalse())
+
+			p4 := ctrlutils.ExactNamePredicate("foo", "*")
+			Expect(p4.Create(e)).To(BeTrue())
+		})
+
+	})
+
 })
 
 func updateEvent(old, new client.Object) event.UpdateEvent {
