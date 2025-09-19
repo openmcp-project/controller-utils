@@ -253,6 +253,42 @@ var _ = Describe("Predicates", func() {
 
 	})
 
+	Context("Event Types", func() {
+
+		It("should match only create events", func() {
+			p := ctrlutils.OnCreatePredicate()
+			Expect(p.Create(event.TypedCreateEvent[client.Object]{})).To(BeTrue())
+			Expect(p.Update(event.TypedUpdateEvent[client.Object]{})).To(BeFalse())
+			Expect(p.Delete(event.TypedDeleteEvent[client.Object]{})).To(BeFalse())
+			Expect(p.Generic(event.GenericEvent{})).To(BeFalse())
+		})
+
+		It("should match only update events", func() {
+			p := ctrlutils.OnUpdatePredicate()
+			Expect(p.Create(event.TypedCreateEvent[client.Object]{})).To(BeFalse())
+			Expect(p.Update(event.TypedUpdateEvent[client.Object]{})).To(BeTrue())
+			Expect(p.Delete(event.TypedDeleteEvent[client.Object]{})).To(BeFalse())
+			Expect(p.Generic(event.GenericEvent{})).To(BeFalse())
+		})
+
+		It("should match only delete events", func() {
+			p := ctrlutils.OnDeletePredicate()
+			Expect(p.Create(event.TypedCreateEvent[client.Object]{})).To(BeFalse())
+			Expect(p.Update(event.TypedUpdateEvent[client.Object]{})).To(BeFalse())
+			Expect(p.Delete(event.TypedDeleteEvent[client.Object]{})).To(BeTrue())
+			Expect(p.Generic(event.GenericEvent{})).To(BeFalse())
+		})
+
+		It("should match only generic events", func() {
+			p := ctrlutils.OnGenericPredicate()
+			Expect(p.Create(event.TypedCreateEvent[client.Object]{})).To(BeFalse())
+			Expect(p.Update(event.TypedUpdateEvent[client.Object]{})).To(BeFalse())
+			Expect(p.Delete(event.TypedDeleteEvent[client.Object]{})).To(BeFalse())
+			Expect(p.Generic(event.GenericEvent{})).To(BeTrue())
+		})
+
+	})
+
 })
 
 func updateEvent(old, new client.Object) event.UpdateEvent {
