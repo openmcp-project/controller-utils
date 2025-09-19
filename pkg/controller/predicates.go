@@ -232,3 +232,63 @@ func ExactNamePredicate(name, namespace string) predicate.Predicate {
 		return obj.GetName() == name && (namespace == "*" || obj.GetNamespace() == namespace)
 	})
 }
+
+/////////////////////////////
+/// EVENT TYPE PREDICATES ///
+/////////////////////////////
+
+type EventType string
+
+const (
+	CreateEvent  EventType = "create"
+	UpdateEvent  EventType = "update"
+	DeleteEvent  EventType = "delete"
+	GenericEvent EventType = "generic"
+)
+
+type eventTypePredicate struct {
+	eventType EventType
+}
+
+var _ predicate.Predicate = eventTypePredicate{}
+
+func (e eventTypePredicate) Create(_ event.TypedCreateEvent[client.Object]) bool {
+	return e.eventType == CreateEvent
+}
+
+func (e eventTypePredicate) Delete(_ event.TypedDeleteEvent[client.Object]) bool {
+	return e.eventType == DeleteEvent
+}
+
+func (e eventTypePredicate) Update(_ event.TypedUpdateEvent[client.Object]) bool {
+	return e.eventType == UpdateEvent
+}
+
+func (e eventTypePredicate) Generic(_ event.TypedGenericEvent[client.Object]) bool {
+	return e.eventType == GenericEvent
+}
+
+// OnCreatePredicate returns a predicate that reacts only to create events.
+func OnCreatePredicate() predicate.Predicate {
+	return OnEventTypePredicate(CreateEvent)
+}
+
+// OnUpdatePredicate returns a predicate that reacts only to update events.
+func OnUpdatePredicate() predicate.Predicate {
+	return OnEventTypePredicate(UpdateEvent)
+}
+
+// OnDeletePredicate returns a predicate that reacts only to delete events.
+func OnDeletePredicate() predicate.Predicate {
+	return OnEventTypePredicate(DeleteEvent)
+}
+
+// OnGenericPredicate returns a predicate that reacts only to generic events.
+func OnGenericPredicate() predicate.Predicate {
+	return OnEventTypePredicate(GenericEvent)
+}
+
+// OnEventTypePredicate returns a predicate that reacts only to events of the specified type.
+func OnEventTypePredicate(eventType EventType) predicate.Predicate {
+	return eventTypePredicate{eventType: eventType}
+}
