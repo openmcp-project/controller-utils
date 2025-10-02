@@ -239,6 +239,28 @@ var _ = Describe("Status Updater", func() {
 			Expect(res.RequeueAfter).To(Equal(30 * time.Second))
 		})
 
+		It("should use the SmartRequeueConditional functions if specified", func() {
+			env := testutils.NewEnvironmentBuilder().WithFakeClient(coScheme).WithInitObjectPath("testdata", "test-02").WithDynamicObjectsWithStatus(&CustomObject{}).Build()
+			obj := &CustomObject{}
+			Expect(env.Client().Get(env.Ctx, controller.ObjectKey("status", "default"), obj)).To(Succeed())
+			rr := controller.ReconcileResult[*CustomObject]{
+				Object:       obj,
+				Conditions:   dummyConditions(),
+				SmartRequeue: controller.SR_NO_REQUEUE,
+			}
+			store := smartrequeue.NewStore(1*time.Second, 10*time.Second, 2.0)
+			su := preconfiguredStatusUpdaterBuilder().WithPhaseUpdateFunc(func(obj *CustomObject, rr controller.ReconcileResult[*CustomObject]) (string, error) {
+				return PhaseSucceeded, nil
+			}).WithSmartRequeue(store, func(rr controller.ReconcileResult[*CustomObject]) controller.SmartRequeueAction {
+				return controller.SR_NO_REQUEUE
+			}, func(rr controller.ReconcileResult[*CustomObject]) controller.SmartRequeueAction {
+				return controller.SR_RESET
+			}).Build()
+			res, err := su.UpdateStatus(env.Ctx, env.Client(), rr)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(res.RequeueAfter).To(Equal(1 * time.Second))
+		})
+
 	})
 
 	Context("GenerateCreateConditionFunc", func() {

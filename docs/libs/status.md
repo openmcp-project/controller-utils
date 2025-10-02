@@ -164,6 +164,7 @@ You can then `Build()` the status updater and run `UpdateStatus()` to do the act
 - By using `WithSmartRequeue`, the [smart requeuing logic](./smartrequeue.md) can be used.
 	- A `smartrequeue.Store` is required to be configured outside of the status updater, because it has to be persisted across multiple reconciliations.
 	- It is also possible to use the smart requeue logic explicitly and modify the `ReconcileResult`'s `Result` field with the returned value, but the integration should be easier to use, since both, the smart requeue logic as well as the status updater, return a `reconcile.Result` and an `error`, which are intended to be directly used as return values for the `Reconcile` method.
+	- The `WithSmartRequeue` function takes `SmartRequeueConditional`s as optional arguments, which are basically functions that take the `ReconcileResult` and return a smart requeue value (see below). This is especially useful to set the requeue depending on the object's new conditions, which would otherwise be difficult, because the conditions have not yet been updated before `UpdateStatus` is called and the requeue time has already been determined when `UpdateStatus` returns.
 
 ### The ReconcileResult
 
