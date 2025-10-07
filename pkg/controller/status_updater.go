@@ -459,9 +459,59 @@ func GenerateCreateConditionFunc[Obj client.Object](rr *ReconcileResult[Obj]) fu
 }
 
 func replaceIllegalCharsInConditionType(s string) string {
-	return strings.NewReplacer(" ", "_", ",", "_", ";", "_", ":", "_").Replace(s)
+	if s == "" {
+		return s
+	}
+
+	result := make([]rune, 0, len(s))
+	for _, r := range s {
+		// Valid characters for condition types are:
+		// - lowercase letters (a-z)
+		// - uppercase letters (A-Z)
+		// - digits (0-9)
+		// - underscore (_)
+		// - hyphen (-)
+		// - dot (.)
+		// All other characters are replaced with underscore
+		if (r >= 'a' && r <= 'z') ||
+			(r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') ||
+			r == '_' ||
+			r == '-' ||
+			r == '.' {
+			result = append(result, r)
+		} else {
+			result = append(result, '_')
+		}
+	}
+	return string(result)
 }
 
 func replaceIllegalCharsInConditionReason(s string) string {
-	return strings.NewReplacer(" ", "_", "-", "_", ".", "_").Replace(s)
+	if s == "" {
+		return s
+	}
+
+	result := make([]rune, 0, len(s))
+	for _, r := range s {
+		// Valid characters for condition types are:
+		// - lowercase letters (a-z)
+		// - uppercase letters (A-Z)
+		// - digits (0-9)
+		// - underscore (_)
+		// - colon (:)
+		//-  comma (,)
+		// All other characters are replaced with underscore
+		if (r >= 'a' && r <= 'z') ||
+			(r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') ||
+			r == '_' ||
+			r == ':' ||
+			r == ',' {
+			result = append(result, r)
+		} else {
+			result = append(result, '_')
+		}
+	}
+	return string(result)
 }
