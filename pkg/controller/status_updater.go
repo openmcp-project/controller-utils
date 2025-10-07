@@ -449,16 +449,17 @@ func GenerateCreateConditionFunc[Obj client.Object](rr *ReconcileResult[Obj]) fu
 	}
 	return func(conType string, status metav1.ConditionStatus, reason, message string) {
 		rr.Conditions = append(rr.Conditions, metav1.Condition{
-			Type:               replaceIllegalCharsInConditionType(conType),
+			Type:               ReplaceIllegalCharsInConditionType(conType),
 			Status:             status,
 			ObservedGeneration: gen,
-			Reason:             replaceIllegalCharsInConditionReason(reason),
+			Reason:             ReplaceIllegalCharsInConditionReason(reason),
 			Message:            message,
 		})
 	}
 }
 
-func replaceIllegalCharsInConditionType(s string) string {
+// ReplaceIllegalCharsInConditionType replaces all characters in the given string that are not allowed in condition types with underscores.
+func ReplaceIllegalCharsInConditionType(s string) string {
 	if s == "" {
 		return s
 	}
@@ -487,7 +488,8 @@ func replaceIllegalCharsInConditionType(s string) string {
 	return string(result)
 }
 
-func replaceIllegalCharsInConditionReason(s string) string {
+// ReplaceIllegalCharsInConditionReason replaces all characters in the given string that are not allowed in condition reasons with underscores.
+func ReplaceIllegalCharsInConditionReason(s string) string {
 	if s == "" {
 		return s
 	}
