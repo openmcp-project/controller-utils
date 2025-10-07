@@ -119,6 +119,21 @@ var _ = Describe("Status Updater", func() {
 		))
 	})
 
+	It("should replace illegal characters in condition type and reason", func() {
+		env := testutils.NewEnvironmentBuilder().WithFakeClient(coScheme).WithInitObjectPath("testdata", "test-02").WithDynamicObjectsWithStatus(&CustomObject{}).Build()
+		obj := &CustomObject{}
+		Expect(env.Client().Get(env.Ctx, controller.ObjectKey("status", "default"), obj)).To(Succeed())
+		rr := &controller.ReconcileResult[*CustomObject]{
+			Object: obj,
+		}
+		condFunc := controller.GenerateCreateConditionFunc(rr)
+
+		condFunc("CondType :,;Test", metav1.ConditionTrue, "Reason -.Test", "Message")
+		Expect(rr.Conditions).To(HaveLen(1))
+		Expect(rr.Conditions[0].Type).To(Equal("CondType____Test"))
+		Expect(rr.Conditions[0].Reason).To(Equal("Reason___Test"))
+	})
+
 	It("should not update disabled fields", func() {
 		env := testutils.NewEnvironmentBuilder().WithFakeClient(coScheme).WithInitObjectPath("testdata", "test-02").WithDynamicObjectsWithStatus(&CustomObject{}).Build()
 		obj := &CustomObject{}

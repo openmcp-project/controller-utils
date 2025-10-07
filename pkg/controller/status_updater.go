@@ -449,11 +449,19 @@ func GenerateCreateConditionFunc[Obj client.Object](rr *ReconcileResult[Obj]) fu
 	}
 	return func(conType string, status metav1.ConditionStatus, reason, message string) {
 		rr.Conditions = append(rr.Conditions, metav1.Condition{
-			Type:               conType,
+			Type:               replaceIllegalCharsInConditionType(conType),
 			Status:             status,
 			ObservedGeneration: gen,
-			Reason:             reason,
+			Reason:             replaceIllegalCharsInConditionReason(reason),
 			Message:            message,
 		})
 	}
+}
+
+func replaceIllegalCharsInConditionType(s string) string {
+	return strings.NewReplacer(" ", "_", ",", "_", ";", "_", ":", "_").Replace(s)
+}
+
+func replaceIllegalCharsInConditionReason(s string) string {
+	return strings.NewReplacer(" ", "_", "-", "_", ".", "_").Replace(s)
 }
