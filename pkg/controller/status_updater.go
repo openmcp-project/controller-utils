@@ -122,6 +122,7 @@ func (b *StatusUpdaterBuilder[Obj]) WithCustomUpdateFunc(f func(obj Obj, rr Reco
 }
 
 type SmartRequeueAction string
+type SmartRequeueConditional[Obj client.Object] func(rr ReconcileResult[Obj]) SmartRequeueAction
 
 const (
 	SR_BACKOFF    SmartRequeueAction = "Backoff"
@@ -135,11 +136,17 @@ const (
 // - "Backoff": the object is requeued with an increasing backoff, as specified in the store.
 // - "Reset": the object is requeued, but the backoff is reset to its minimal value, as specified in the store.
 // - "NoRequeue": the object is not requeued.
+//
+// If any SmartRequeueConditionals are passed in, they will be evaluated in order and can override the action set in the ReconcileResult.
+// As determining the requeue time is the last thing that happens in the status updater, these functions can be used react to the final status of the reconciled object, which might not be known earlier in the reconciliation
+// (e.g. because the conditions were only updated in the status updater).
+//
 // If the 'Result' field in the ReconcileResult has a non-zero RequeueAfter value set, that one is used if it is earlier than the one from smart requeue or if "NoRequeue" has been specified.
 // This function only has an effect if the Object in the ReconcileResult is not nil, the smart requeue store is not nil, and the action is one of the known values.
 // Also, if a reconciliation error occurred, the requeue interval will be reset, but no requeueAfter duration will be set, because controller-runtime will take care of requeuing the object anyway.
-func (b *StatusUpdaterBuilder[Obj]) WithSmartRequeue(store *smartrequeue.Store) *StatusUpdaterBuilder[Obj] {
+func (b *StatusUpdaterBuilder[Obj]) WithSmartRequeue(store *smartrequeue.Store, smartRequeueConditionals ...SmartRequeueConditional[Obj]) *StatusUpdaterBuilder[Obj] {
 	b.internal.smartRequeueStore = store
+	b.internal.smartRequeueConditionals = smartRequeueConditionals
 	return b
 }
 
@@ -182,6 +189,7 @@ type statusUpdater[Obj client.Object] struct {
 	eventRecorder             record.EventRecorder
 	eventVerbosity            conditions.EventVerbosity
 	smartRequeueStore         *smartrequeue.Store
+	smartRequeueConditionals  []SmartRequeueConditional[Obj]
 }
 
 func newStatusUpdater[Obj client.Object]() *statusUpdater[Obj] {
@@ -295,6 +303,11 @@ func (s *statusUpdater[Obj]) UpdateStatus(ctx context.Context, c client.Client, 
 		if rr.ReconcileError != nil {
 			srRes, _ = s.smartRequeueStore.For(rr.Object).Error(rr.ReconcileError)
 		} else {
+			for _, srcFunc := range s.smartRequeueConditionals {
+				if srcFunc != nil {
+					rr.SmartRequeue = srcFunc(rr)
+				}
+			}
 			switch rr.SmartRequeue {
 			case SR_BACKOFF:
 				srRes, _ = s.smartRequeueStore.For(rr.Object).Backoff()
