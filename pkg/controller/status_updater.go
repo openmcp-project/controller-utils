@@ -449,11 +449,71 @@ func GenerateCreateConditionFunc[Obj client.Object](rr *ReconcileResult[Obj]) fu
 	}
 	return func(conType string, status metav1.ConditionStatus, reason, message string) {
 		rr.Conditions = append(rr.Conditions, metav1.Condition{
-			Type:               conType,
+			Type:               ReplaceIllegalCharsInConditionType(conType),
 			Status:             status,
 			ObservedGeneration: gen,
-			Reason:             reason,
+			Reason:             ReplaceIllegalCharsInConditionReason(reason),
 			Message:            message,
 		})
 	}
+}
+
+// ReplaceIllegalCharsInConditionType replaces all characters in the given string that are not allowed in condition types with underscores.
+func ReplaceIllegalCharsInConditionType(s string) string {
+	if s == "" {
+		return s
+	}
+
+	result := make([]rune, 0, len(s))
+	for _, r := range s {
+		// Valid characters for condition types are:
+		// - lowercase letters (a-z)
+		// - uppercase letters (A-Z)
+		// - digits (0-9)
+		// - underscore (_)
+		// - hyphen (-)
+		// - dot (.)
+		// All other characters are replaced with underscore
+		if (r >= 'a' && r <= 'z') ||
+			(r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') ||
+			r == '_' ||
+			r == '-' ||
+			r == '.' {
+			result = append(result, r)
+		} else {
+			result = append(result, '_')
+		}
+	}
+	return string(result)
+}
+
+// ReplaceIllegalCharsInConditionReason replaces all characters in the given string that are not allowed in condition reasons with underscores.
+func ReplaceIllegalCharsInConditionReason(s string) string {
+	if s == "" {
+		return s
+	}
+
+	result := make([]rune, 0, len(s))
+	for _, r := range s {
+		// Valid characters for condition types are:
+		// - lowercase letters (a-z)
+		// - uppercase letters (A-Z)
+		// - digits (0-9)
+		// - underscore (_)
+		// - colon (:)
+		//-  comma (,)
+		// All other characters are replaced with underscore
+		if (r >= 'a' && r <= 'z') ||
+			(r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') ||
+			r == '_' ||
+			r == ':' ||
+			r == ',' {
+			result = append(result, r)
+		} else {
+			result = append(result, '_')
+		}
+	}
+	return string(result)
 }
