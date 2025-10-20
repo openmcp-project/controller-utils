@@ -387,8 +387,8 @@ func createOIDCKubeconfig(opts *CreateOIDCKubeconfigOptions) ([]byte, error) {
 	for _, extraScope := range opts.ExtraScopes {
 		exec.Args = append(exec.Args, "--oidc-extra-scope="+extraScope)
 	}
-	if opts.UsePKCE {
-		exec.Args = append(exec.Args, "--oidc-pkce-method=auto")
+	if opts.PKCEMethod != "" {
+		exec.Args = append(exec.Args, "--oidc-pkce-method="+string(opts.PKCEMethod))
 	}
 	if opts.ForceRefresh {
 		exec.Args = append(exec.Args, "--force-refresh")
@@ -434,7 +434,7 @@ type CreateOIDCKubeconfigOptions struct {
 	ClientID     string
 	ClientSecret string
 	ExtraScopes  []string
-	UsePKCE      bool
+	PKCEMethod   PKCEMethod
 	ForceRefresh bool
 	GrantType    OIDCGrantType
 }
@@ -449,6 +449,14 @@ const (
 	GrantTypeDeviceCode       OIDCGrantType = "device-code"
 )
 
+type PKCEMethod string
+
+const (
+	PKCEMethodAuto PKCEMethod = "auto"
+	PKCEMethodNo   PKCEMethod = "no"
+	PKCEMethodS256 PKCEMethod = "S256"
+)
+
 type CreateOIDCKubeconfigOption func(*CreateOIDCKubeconfigOptions)
 
 // WithExtraScope is an option for CreateOIDCKubeconfig that adds an extra scope to the oidc-login subcommand.
@@ -459,10 +467,10 @@ func WithExtraScope(scope string) CreateOIDCKubeconfigOption {
 	}
 }
 
-// UsePKCE is an option for CreateOIDCKubeconfig that enforces the use of PKCE.
-func UsePKCE() CreateOIDCKubeconfigOption {
+// WithPKCEMethod is an option for CreateOIDCKubeconfig that sets PKCE method.
+func WithPKCEMethod(m PKCEMethod) CreateOIDCKubeconfigOption {
 	return func(opts *CreateOIDCKubeconfigOptions) {
-		opts.UsePKCE = true
+		opts.PKCEMethod = m
 	}
 }
 

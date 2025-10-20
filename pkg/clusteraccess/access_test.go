@@ -495,7 +495,7 @@ var _ = Describe("ClusterAccess", func() {
 			kcfgBytes, err := clusteraccess.CreateOIDCKubeconfig("testuser", "https://api.example.com", []byte("test-ca"), "https://example.com/oidc", "test-client-id",
 				clusteraccess.WithExtraScope("foo"),
 				clusteraccess.WithExtraScope("bar"),
-				clusteraccess.UsePKCE(),
+				clusteraccess.WithPKCEMethod(clusteraccess.PKCEMethodAuto),
 				clusteraccess.ForceRefresh(),
 				clusteraccess.WithClientSecret("test-client-secret"),
 				clusteraccess.WithGrantType(clusteraccess.GrantTypePassword),
