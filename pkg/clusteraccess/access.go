@@ -467,7 +467,7 @@ func WithExtraScope(scope string) CreateOIDCKubeconfigOption {
 	}
 }
 
-// WithPKCEMethod is an option for CreateOIDCKubeconfig that sets PKCE method.
+// WithPKCEMethod is an option for CreateOIDCKubeconfig that sets the PKCE method.
 func WithPKCEMethod(m PKCEMethod) CreateOIDCKubeconfigOption {
 	return func(opts *CreateOIDCKubeconfigOptions) {
 		opts.PKCEMethod = m
