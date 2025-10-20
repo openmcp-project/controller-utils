@@ -388,7 +388,7 @@ func createOIDCKubeconfig(opts *CreateOIDCKubeconfigOptions) ([]byte, error) {
 		exec.Args = append(exec.Args, "--oidc-extra-scope="+extraScope)
 	}
 	if opts.UsePKCE {
-		exec.Args = append(exec.Args, "--oidc-use-pkce")
+		exec.Args = append(exec.Args, "--oidc-pkce-method=auto")
 	}
 	if opts.ForceRefresh {
 		exec.Args = append(exec.Args, "--force-refresh")

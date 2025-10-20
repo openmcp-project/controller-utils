@@ -523,7 +523,7 @@ var _ = Describe("ClusterAccess", func() {
 				"--grant-type=password",
 				"--oidc-extra-scope=foo",
 				"--oidc-extra-scope=bar",
-				"--oidc-use-pkce",
+				"--oidc-pkce-method=auto",
 				"--force-refresh",
 			))
 		})
