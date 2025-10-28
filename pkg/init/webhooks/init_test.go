@@ -30,7 +30,7 @@ func Test_GenerateCertificate(t *testing.T) {
 		desc     string
 		setup    func(ctx context.Context, c client.Client) error
 		validate func(ctx context.Context, c client.Client, t *testing.T, testErr error) error
-		options  []certOption
+		options  []CertOption
 	}{
 		{
 			desc: "should generate certificate",
@@ -64,7 +64,7 @@ func Test_GenerateCertificate(t *testing.T) {
 		},
 		{
 			desc: "should generate certificate with custom object names",
-			options: []certOption{
+			options: []CertOption{
 				WithWebhookSecret{Name: "myothersecret", Namespace: "myothernamespace"},
 				WithWebhookService{Name: "myotherservice", Namespace: "myothernamespace"},
 				WithAdditionalDNSNames{"some.other.name.example.com"},
@@ -165,7 +165,7 @@ func Test_Install(t *testing.T) {
 		desc     string
 		setup    func(ctx context.Context, c client.Client) error
 		validate func(ctx context.Context, c client.Client, t *testing.T, testErr error) error
-		options  []installOption
+		options  []InstallOption
 	}{
 		{
 			desc: "should create webhook configurations for TestObj",
@@ -224,7 +224,7 @@ func Test_Install(t *testing.T) {
 		},
 		{
 			desc: "should create webhook configurations for TestObj with custom values",
-			options: []installOption{
+			options: []InstallOption{
 				WithoutCA,
 				WithCustomBaseURL("https://webhooks.example.com"),
 			},

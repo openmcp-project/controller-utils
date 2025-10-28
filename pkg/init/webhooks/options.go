@@ -3,6 +3,7 @@ package webhooks
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -21,9 +22,11 @@ type installOptions struct {
 	webhookService     types.NamespacedName
 	webhookSecret      types.NamespacedName
 	webhookServicePort int32
+	managedLabels      map[string]string
+	managedService     *WithManagedWebhookService
 }
 
-type installOption interface {
+type InstallOption interface {
 	ApplyToInstallOptions(o *installOptions)
 }
 
@@ -37,7 +40,7 @@ type certOptions struct {
 	additionalDNSNames []string
 }
 
-type certOption interface {
+type CertOption interface {
 	ApplyToCertOptions(o *certOptions)
 }
 
@@ -133,4 +136,29 @@ type WithAdditionalDNSNames []string
 
 func (opt WithAdditionalDNSNames) ApplyToCertOptions(o *certOptions) {
 	o.additionalDNSNames = opt
+}
+
+//
+// Managed Webhook Service
+//
+
+// WithManagedWebhookService allows to have the webhook service created and managed by this library.
+type WithManagedWebhookService struct {
+	TargetPort     intstr.IntOrString
+	SelectorLabels map[string]string
+}
+
+func (opt WithManagedWebhookService) ApplyToInstallOptions(o *installOptions) {
+	o.managedService = &opt
+}
+
+//
+// Managed Labels
+//
+
+// WithManagedLabels specifies labels which should be added to resources created by this library.
+type WithManagedLabels map[string]string
+
+func (opt WithManagedLabels) ApplyToInstallOptions(o *installOptions) {
+	o.managedLabels = map[string]string(opt)
 }
