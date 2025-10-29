@@ -18,7 +18,7 @@ var (
 )
 
 // GenerateCertificate
-func GenerateCertificate(ctx context.Context, c client.Client, options ...certOption) error {
+func GenerateCertificate(ctx context.Context, c client.Client, options ...CertOption) error {
 	opts := &certOptions{
 		webhookService: getWebhookServiceFromEnv(),
 		webhookSecret:  getWebhookSecretFromEnv(),
@@ -71,7 +71,7 @@ func Install(
 	c client.Client,
 	scheme *runtime.Scheme,
 	apiTypes []client.Object,
-	options ...installOption,
+	options ...InstallOption,
 ) error {
 	opts := &installOptions{
 		localClient:        c,
@@ -98,6 +98,12 @@ func Install(
 		opts.caData = secret.Data[corev1.TLSCertKey]
 	}
 
+	if opts.managedService != nil {
+		if err := applyWebhookService(ctx, opts); err != nil {
+			return err
+		}
+	}
+
 	for _, o := range apiTypes {
 		_, isCustomValidator := o.(webhook.CustomValidator)
 		if isCustomValidator {
@@ -114,5 +120,49 @@ func Install(
 	}
 
 	log.Println("Webhooks initialized")
+	return nil
+}
+
+func Uninstall(
+	ctx context.Context,
+	c client.Client,
+	scheme *runtime.Scheme,
+	apiTypes []client.Object,
+	options ...InstallOption,
+) error {
+	opts := &installOptions{
+		localClient:        c,
+		remoteClient:       c,
+		scheme:             scheme,
+		webhookService:     getWebhookServiceFromEnv(),
+		webhookSecret:      getWebhookSecretFromEnv(),
+		webhookServicePort: 443,
+	}
+	for _, io := range options {
+		io.ApplyToInstallOptions(opts)
+	}
+
+	if opts.managedService != nil {
+		if err := removeWebhookService(ctx, opts); err != nil {
+			return err
+		}
+	}
+
+	for _, o := range apiTypes {
+		_, isCustomValidator := o.(webhook.CustomValidator)
+		if isCustomValidator {
+			if err := removeValidatingWebhook(ctx, opts, o); err != nil {
+				return err
+			}
+		}
+		_, isCustomDefaulter := o.(webhook.CustomDefaulter)
+		if isCustomDefaulter {
+			if err := removeMutatingWebhook(ctx, opts, o); err != nil {
+				return err
+			}
+		}
+	}
+
+	log.Println("Webhooks removed")
 	return nil
 }

@@ -12,8 +12,8 @@ const (
 
 type Flags struct {
 	Install        bool
-	InstallOptions []installOption
-	CertOptions    []certOption
+	InstallOptions []InstallOption
+	CertOptions    []CertOption
 	BindHost       string
 	BindPort       int
 }

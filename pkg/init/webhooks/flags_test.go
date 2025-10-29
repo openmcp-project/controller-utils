@@ -27,12 +27,12 @@ func Test_BindFlags(t *testing.T) {
 	assert.NotNil(t, flags)
 	assert.Equal(t, &Flags{
 		Install: true,
-		InstallOptions: []installOption{
+		InstallOptions: []InstallOption{
 			WithoutCA,
 			WithCustomBaseURL("https://webhooks.example.com"),
 			WithWebhookServicePort(1234),
 		},
-		CertOptions: []certOption{
+		CertOptions: []CertOption{
 			WithAdditionalDNSNames{"webhooks.example.com", "webhooks.example.org"},
 		},
 		BindHost: "someaddr",

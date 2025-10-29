@@ -7,11 +7,15 @@ import (
 	"strings"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	"github.com/openmcp-project/controller-utils/pkg/collections/maps"
 )
 
 func applyValidatingWebhook(ctx context.Context, opts *installOptions, obj client.Object) error {
@@ -30,6 +34,7 @@ func applyValidatingWebhook(ctx context.Context, opts *installOptions, obj clien
 	resource := strings.ToLower(gvk.Kind + "s")
 
 	result, err := controllerutil.CreateOrUpdate(ctx, opts.remoteClient, cfg, func() error {
+		cfg.Labels = maps.Merge(cfg.Labels, opts.managedLabels)
 		webhook := admissionregistrationv1.ValidatingWebhook{
 			Name:                    strings.ToLower(fmt.Sprintf("v%s.%s", gvk.Kind, gvk.Group)),
 			FailurePolicy:           ptr.To(admissionregistrationv1.Fail),
@@ -88,6 +93,7 @@ func applyMutatingWebhook(ctx context.Context, opts *installOptions, obj client.
 	resource := strings.ToLower(gvk.Kind + "s")
 
 	result, err := controllerutil.CreateOrUpdate(ctx, opts.remoteClient, cfg, func() error {
+		cfg.Labels = maps.Merge(cfg.Labels, opts.managedLabels)
 		webhook := admissionregistrationv1.MutatingWebhook{
 			Name:                    strings.ToLower(fmt.Sprintf("m%s.%s", gvk.Kind, gvk.Group)),
 			FailurePolicy:           ptr.To(admissionregistrationv1.Fail),
@@ -126,5 +132,31 @@ func applyMutatingWebhook(ctx context.Context, opts *installOptions, obj client.
 		return nil
 	})
 	log.Println("Mutating webhook config", cfg.Name, result)
+	return err
+}
+
+func applyWebhookService(ctx context.Context, opts *installOptions) error {
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      opts.webhookService.Name,
+			Namespace: opts.webhookService.Namespace,
+		},
+	}
+
+	result, err := controllerutil.CreateOrUpdate(ctx, opts.localClient, svc, func() error {
+		svc.Labels = maps.Merge(svc.Labels, opts.managedLabels)
+		svc.Spec.Selector = opts.managedService.SelectorLabels
+		svc.Spec.Type = corev1.ServiceTypeClusterIP
+		svc.Spec.Ports = []corev1.ServicePort{
+			{
+				Name:       "https",
+				Protocol:   corev1.ProtocolTCP,
+				Port:       opts.webhookServicePort,
+				TargetPort: opts.managedService.TargetPort,
+			},
+		}
+		return nil
+	})
+	log.Println("Webhook service", types.NamespacedName{Namespace: svc.Namespace, Name: svc.Name}.String(), result)
 	return err
 }
