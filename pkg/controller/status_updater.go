@@ -449,87 +449,11 @@ func GenerateCreateConditionFunc[Obj client.Object](rr *ReconcileResult[Obj]) fu
 	}
 	return func(conType string, status metav1.ConditionStatus, reason, message string) {
 		rr.Conditions = append(rr.Conditions, metav1.Condition{
-			Type:               ReplaceIllegalCharsInConditionType(conType),
+			Type:               conditions.ReplaceIllegalCharsInConditionType(conType),
 			Status:             status,
 			ObservedGeneration: gen,
-			Reason:             ReplaceIllegalCharsInConditionReason(reason),
+			Reason:             conditions.ReplaceIllegalCharsInConditionReason(reason),
 			Message:            message,
 		})
 	}
-}
-
-// ReplaceIllegalCharsInConditionType replaces all characters in the given string that are not allowed in condition types with underscores.
-func ReplaceIllegalCharsInConditionType(s string) string {
-	if s == "" {
-		return s
-	}
-
-	result := make([]rune, 0, len(s))
-	for _, r := range s {
-		// Valid characters for condition types are:
-		// - lowercase letters (a-z)
-		// - uppercase letters (A-Z)
-		// - digits (0-9)
-		// - underscore (_)
-		// - hyphen (-)
-		// - dot (.)
-		// All other characters are replaced with underscore
-		if (r >= 'a' && r <= 'z') ||
-			(r >= 'A' && r <= 'Z') ||
-			(r >= '0' && r <= '9') ||
-			r == '_' ||
-			r == '-' ||
-			r == '.' {
-			result = append(result, r)
-		} else {
-			result = append(result, '_')
-		}
-	}
-	return ensureStartsAndEndsWithLetter(string(result), 'T', 't')
-}
-
-// ReplaceIllegalCharsInConditionReason replaces all characters in the given string that are not allowed in condition reasons with underscores.
-func ReplaceIllegalCharsInConditionReason(s string) string {
-	if s == "" {
-		return s
-	}
-
-	result := make([]rune, 0, len(s))
-	for _, r := range s {
-		// Valid characters for condition types are:
-		// - lowercase letters (a-z)
-		// - uppercase letters (A-Z)
-		// - digits (0-9)
-		// - underscore (_)
-		// - colon (:)
-		//-  comma (,)
-		// All other characters are replaced with underscore
-		if (r >= 'a' && r <= 'z') ||
-			(r >= 'A' && r <= 'Z') ||
-			(r >= '0' && r <= '9') ||
-			r == '_' ||
-			r == ':' ||
-			r == ',' {
-			result = append(result, r)
-		} else {
-			result = append(result, '_')
-		}
-	}
-	return ensureStartsAndEndsWithLetter(string(result), 'R', 'r')
-}
-
-func ensureStartsAndEndsWithLetter(s string, start, end rune) string {
-	if s == "" {
-		return s
-	}
-	runes := []rune(s)
-	// Ensure starts with letter
-	if (runes[0] < 'a' || runes[0] > 'z') && (runes[0] < 'A' || runes[0] > 'Z') {
-		runes = append([]rune{start}, runes...)
-	}
-	// Ensure ends with letter
-	if (runes[len(runes)-1] < 'a' || runes[len(runes)-1] > 'z') && (runes[len(runes)-1] < 'A' || runes[len(runes)-1] > 'Z') {
-		runes = append(runes, end)
-	}
-	return string(runes)
 }
