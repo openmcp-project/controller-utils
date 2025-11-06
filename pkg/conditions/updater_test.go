@@ -238,7 +238,7 @@ var _ = Describe("Conditions", func() {
 				MatchCondition(TestCondition().
 					WithType("TestCondition.Test").
 					WithStatus(metav1.ConditionFalse).
-					WithReason("TestCondition:Test_False").
+					WithReason("TestCondition_Test_False").
 					WithMessage("")),
 			))
 		})

@@ -128,10 +128,10 @@ var _ = Describe("Status Updater", func() {
 		}
 		condFunc := controller.GenerateCreateConditionFunc(rr)
 
-		condFunc("CondType :,;-_.Test02@", metav1.ConditionTrue, "Reason -.,:_Test93$", "Message")
+		condFunc("0CondType :,;-_.Test02@", metav1.ConditionTrue, "1Reason -.,:_Test93$", "Message")
 		Expect(rr.Conditions).To(HaveLen(1))
-		Expect(rr.Conditions[0].Type).To(Equal("CondType____-_.Test02_"))
-		Expect(rr.Conditions[0].Reason).To(Equal("Reason___,:_Test93_"))
+		Expect(rr.Conditions[0].Type).To(Equal("T0CondType____-_.Test02_t"))
+		Expect(rr.Conditions[0].Reason).To(Equal("R1Reason___,:_Test93_r"))
 	})
 
 	It("should not update disabled fields", func() {
