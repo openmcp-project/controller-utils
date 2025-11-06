@@ -290,7 +290,7 @@ func ReplaceIllegalCharsInConditionType(s string) string {
 			result = append(result, '_')
 		}
 	}
-	
+
 	return string(result)
 }
 
