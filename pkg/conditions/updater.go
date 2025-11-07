@@ -290,7 +290,8 @@ func ReplaceIllegalCharsInConditionType(s string) string {
 			result = append(result, '_')
 		}
 	}
-	return ensureStartsAndEndsWithLetter(string(result), 'T', 't')
+
+	return string(result)
 }
 
 // ReplaceIllegalCharsInConditionReason replaces all characters in the given string that are not allowed in condition reasons with underscores.
@@ -320,21 +321,6 @@ func ReplaceIllegalCharsInConditionReason(s string) string {
 			result = append(result, '_')
 		}
 	}
-	return ensureStartsAndEndsWithLetter(string(result), 'R', 'r')
-}
 
-func ensureStartsAndEndsWithLetter(s string, start, end rune) string {
-	if s == "" {
-		return s
-	}
-	runes := []rune(s)
-	// Ensure starts with letter
-	if (runes[0] < 'a' || runes[0] > 'z') && (runes[0] < 'A' || runes[0] > 'Z') {
-		runes = append([]rune{start}, runes...)
-	}
-	// Ensure ends with letter
-	if (runes[len(runes)-1] < 'a' || runes[len(runes)-1] > 'z') && (runes[len(runes)-1] < 'A' || runes[len(runes)-1] > 'Z') {
-		runes = append(runes, end)
-	}
-	return string(runes)
+	return string(result)
 }
