@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 var (
@@ -66,11 +65,21 @@ func GenerateCertificate(ctx context.Context, c client.Client, options ...CertOp
 	return err
 }
 
+// APITypes defines an API type along with whether it has a validator and/or defaulter webhook.
+type APITypes struct {
+	// Obj is the API type object.
+	Obj client.Object
+	// Validator indicates whether the type has a validating webhook.
+	Validator bool
+	// Defaulter indicates whether the type has a mutating webhook.
+	Defaulter bool
+}
+
 func Install(
 	ctx context.Context,
 	c client.Client,
 	scheme *runtime.Scheme,
-	apiTypes []client.Object,
+	apiTypes []APITypes,
 	options ...InstallOption,
 ) error {
 	opts := &installOptions{
@@ -104,16 +113,14 @@ func Install(
 		}
 	}
 
-	for _, o := range apiTypes {
-		_, isCustomValidator := o.(webhook.CustomValidator)
-		if isCustomValidator {
-			if err := applyValidatingWebhook(ctx, opts, o); err != nil {
+	for _, t := range apiTypes {
+		if t.Validator {
+			if err := applyValidatingWebhook(ctx, opts, t.Obj); err != nil {
 				return err
 			}
 		}
-		_, isCustomDefaulter := o.(webhook.CustomDefaulter)
-		if isCustomDefaulter {
-			if err := applyMutatingWebhook(ctx, opts, o); err != nil {
+		if t.Defaulter {
+			if err := applyMutatingWebhook(ctx, opts, t.Obj); err != nil {
 				return err
 			}
 		}
@@ -127,7 +134,7 @@ func Uninstall(
 	ctx context.Context,
 	c client.Client,
 	scheme *runtime.Scheme,
-	apiTypes []client.Object,
+	apiTypes []APITypes,
 	options ...InstallOption,
 ) error {
 	opts := &installOptions{
@@ -148,16 +155,14 @@ func Uninstall(
 		}
 	}
 
-	for _, o := range apiTypes {
-		_, isCustomValidator := o.(webhook.CustomValidator)
-		if isCustomValidator {
-			if err := removeValidatingWebhook(ctx, opts, o); err != nil {
+	for _, t := range apiTypes {
+		if t.Validator {
+			if err := removeValidatingWebhook(ctx, opts, t.Obj); err != nil {
 				return err
 			}
 		}
-		_, isCustomDefaulter := o.(webhook.CustomDefaulter)
-		if isCustomDefaulter {
-			if err := removeMutatingWebhook(ctx, opts, o); err != nil {
+		if t.Defaulter {
+			if err := removeMutatingWebhook(ctx, opts, t.Obj); err != nil {
 				return err
 			}
 		}
