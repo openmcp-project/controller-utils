@@ -271,7 +271,14 @@ func Test_Install(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			testErr := Install(ctx, c, c.Scheme(), []client.Object{&TestObj{}}, tC.options...)
+			apiTypes := []APITypes{
+				{
+					Obj:       &TestObj{},
+					Validator: true,
+					Defaulter: true,
+				},
+			}
+			testErr := Install(ctx, c, c.Scheme(), apiTypes, tC.options...)
 
 			if err := tC.validate(ctx, c, t, testErr); err != nil {
 				t.Fatal(err)
