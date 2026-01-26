@@ -11,7 +11,7 @@ import (
 	"github.com/openmcp-project/controller-utils/pkg/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -95,7 +95,7 @@ func (b *StatusUpdaterBuilder[Obj]) WithConditionUpdater(removeUntouchedConditio
 // WithConditionEvents sets the event recorder and the verbosity that is used for recording events for changed conditions.
 // If the event recorder is nil, no events are recorded.
 // Note that this has no effect if condition updates are enabled, see WithConditionUpdater().
-func (b *StatusUpdaterBuilder[Obj]) WithConditionEvents(eventRecorder record.EventRecorder, verbosity conditions.EventVerbosity) *StatusUpdaterBuilder[Obj] {
+func (b *StatusUpdaterBuilder[Obj]) WithConditionEvents(eventRecorder events.EventRecorder, verbosity conditions.EventVerbosity) *StatusUpdaterBuilder[Obj] {
 	b.internal.eventRecorder = eventRecorder
 	b.internal.eventVerbosity = verbosity
 	return b
@@ -186,7 +186,7 @@ type statusUpdater[Obj client.Object] struct {
 	phaseUpdateFunc           func(obj Obj, rr ReconcileResult[Obj]) (string, error)
 	customUpdateFunc          func(obj Obj, rr ReconcileResult[Obj]) error
 	removeUntouchedConditions bool
-	eventRecorder             record.EventRecorder
+	eventRecorder             events.EventRecorder
 	eventVerbosity            conditions.EventVerbosity
 	smartRequeueStore         *smartrequeue.Store
 	smartRequeueConditionals  []SmartRequeueConditional[Obj]

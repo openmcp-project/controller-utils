@@ -9,7 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 
 	"github.com/openmcp-project/controller-utils/pkg/collections"
 )
@@ -41,7 +41,7 @@ type conditionUpdater struct {
 	Now             metav1.Time
 	conditions      map[string]metav1.Condition
 	original        map[string]metav1.Condition
-	eventRecoder    record.EventRecorder
+	eventRecoder    events.EventRecorder
 	eventVerbosity  EventVerbosity
 	updates         map[string]metav1.ConditionStatus
 	removeUntouched bool
@@ -78,7 +78,7 @@ func ConditionUpdater(conditions []metav1.Condition, removeUntouched bool) *cond
 // Note that this method must be called before any UpdateCondition calls, otherwise the events for the conditions will not be recorded.
 // The verbosity argument controls how many events are recorded and what information they contain.
 // If the event recorder is nil, no events will be recorded.
-func (c *conditionUpdater) WithEventRecorder(recorder record.EventRecorder, verbosity EventVerbosity) *conditionUpdater {
+func (c *conditionUpdater) WithEventRecorder(recorder events.EventRecorder, verbosity EventVerbosity) *conditionUpdater {
 	c.eventRecoder = recorder
 	c.eventVerbosity = verbosity
 	return c
@@ -197,16 +197,16 @@ func (c *conditionUpdater) Record(obj runtime.Object) *conditionUpdater {
 		for _, con := range updatedCons {
 			oldCon, found := c.original[con.Type]
 			if !found {
-				c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, EventReasonConditionChanged, "Condition '%s' added with status '%s'", con.Type, con.Status)
+				c.eventRecoder.Eventf(obj, nil, corev1.EventTypeNormal, EventReasonConditionChanged, "", "Condition '%s' added with status '%s'", con.Type, con.Status)
 				continue
 			}
 			if con.Status != oldCon.Status {
-				c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, EventReasonConditionChanged, "Condition '%s' changed from '%s' to '%s'", con.Type, oldCon.Status, con.Status)
+				c.eventRecoder.Eventf(obj, nil, corev1.EventTypeNormal, EventReasonConditionChanged, "", "Condition '%s' changed from '%s' to '%s'", con.Type, oldCon.Status, con.Status)
 				continue
 			}
 		}
 		for conType, oldStatus := range lostCons {
-			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, EventReasonConditionChanged, "Condition '%s' with status '%s' removed", conType, oldStatus)
+			c.eventRecoder.Eventf(obj, nil, corev1.EventTypeNormal, EventReasonConditionChanged, "", "Condition '%s' with status '%s' removed", conType, oldStatus)
 		}
 
 	case EventPerNewStatus:
@@ -230,16 +230,16 @@ func (c *conditionUpdater) Record(obj runtime.Object) *conditionUpdater {
 		}
 
 		if trueCons.Len() > 0 {
-			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, EventReasonConditionChanged, "The following conditions changed to 'True': %s", strings.Join(sets.List(trueCons), ", "))
+			c.eventRecoder.Eventf(obj, nil, corev1.EventTypeNormal, EventReasonConditionChanged, "", "The following conditions changed to 'True': %s", strings.Join(sets.List(trueCons), ", "))
 		}
 		if falseCons.Len() > 0 {
-			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, EventReasonConditionChanged, "The following conditions changed to 'False': %s", strings.Join(sets.List(falseCons), ", "))
+			c.eventRecoder.Eventf(obj, nil, corev1.EventTypeNormal, EventReasonConditionChanged, "", "The following conditions changed to 'False': %s", strings.Join(sets.List(falseCons), ", "))
 		}
 		if unknownCons.Len() > 0 {
-			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, EventReasonConditionChanged, "The following conditions changed to 'Unknown': %s", strings.Join(sets.List(unknownCons), ", "))
+			c.eventRecoder.Eventf(obj, nil, corev1.EventTypeNormal, EventReasonConditionChanged, "", "The following conditions changed to 'Unknown': %s", strings.Join(sets.List(unknownCons), ", "))
 		}
 		if len(lostCons) > 0 {
-			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, EventReasonConditionChanged, "The following conditions were removed: %s", strings.Join(sets.List(sets.KeySet(lostCons)), ", "))
+			c.eventRecoder.Eventf(obj, nil, corev1.EventTypeNormal, EventReasonConditionChanged, "", "The following conditions were removed: %s", strings.Join(sets.List(sets.KeySet(lostCons)), ", "))
 		}
 
 	case EventIfChanged:
@@ -253,7 +253,7 @@ func (c *conditionUpdater) Record(obj runtime.Object) *conditionUpdater {
 			changedCons.Insert(conType)
 		}
 		if changedCons.Len() > 0 {
-			c.eventRecoder.Eventf(obj, corev1.EventTypeNormal, EventReasonConditionChanged, "The following conditions have changed: %s", strings.Join(sets.List(changedCons), ", "))
+			c.eventRecoder.Eventf(obj, nil, corev1.EventTypeNormal, EventReasonConditionChanged, "", "The following conditions have changed: %s", strings.Join(sets.List(changedCons), ", "))
 		}
 	}
 

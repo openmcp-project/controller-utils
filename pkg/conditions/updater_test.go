@@ -12,7 +12,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 
 	"github.com/openmcp-project/controller-utils/pkg/conditions"
 )
@@ -247,7 +247,7 @@ var _ = Describe("Conditions", func() {
 
 	Context("EventRecorder", func() {
 
-		var recorder *record.FakeRecorder
+		var recorder *events.FakeRecorder
 
 		dummy := &dummyObject{
 			TypeMeta: metav1.TypeMeta{
@@ -257,7 +257,7 @@ var _ = Describe("Conditions", func() {
 		}
 
 		BeforeEach(func() {
-			recorder = record.NewFakeRecorder(100)
+			recorder = events.NewFakeRecorder(100)
 		})
 
 		AfterEach(func() {

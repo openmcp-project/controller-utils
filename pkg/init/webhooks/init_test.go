@@ -14,7 +14,6 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -293,8 +292,8 @@ var (
 )
 
 var _ client.Object = &TestObj{}
-var _ webhook.CustomValidator = &TestObj{}
-var _ webhook.CustomDefaulter = &TestObj{}
+var _ admission.Defaulter[*TestObj] = &TestObj{}
+var _ admission.Validator[*TestObj] = &TestObj{}
 
 type TestObj struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -302,22 +301,22 @@ type TestObj struct {
 }
 
 // Default implements admission.Defaulter.
-func (*TestObj) Default(_ context.Context, _ runtime.Object) error {
+func (*TestObj) Default(_ context.Context, _ *TestObj) error {
 	panic("unimplemented")
 }
 
 // ValidateCreate implements admission.Validator.
-func (*TestObj) ValidateCreate(_ context.Context, _ runtime.Object) (warnings admission.Warnings, err error) {
+func (*TestObj) ValidateCreate(_ context.Context, _ *TestObj) (warnings admission.Warnings, err error) {
 	panic("unimplemented")
 }
 
 // ValidateDelete implements admission.Validator.
-func (*TestObj) ValidateDelete(_ context.Context, _ runtime.Object) (warnings admission.Warnings, err error) {
+func (*TestObj) ValidateDelete(_ context.Context, _ *TestObj) (warnings admission.Warnings, err error) {
 	panic("unimplemented")
 }
 
 // ValidateUpdate implements admission.Validator.
-func (*TestObj) ValidateUpdate(_ context.Context, _ runtime.Object, _ runtime.Object) (warnings admission.Warnings, err error) {
+func (*TestObj) ValidateUpdate(_ context.Context, _ *TestObj, _ *TestObj) (warnings admission.Warnings, err error) {
 	panic("unimplemented")
 }
 
