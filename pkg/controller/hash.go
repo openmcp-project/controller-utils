@@ -124,6 +124,7 @@ func ObjectHashSHAKE128Base32(obj client.Object) string {
 
 // ShortenToXCharacters shortens the input string if it exceeds maxLen.
 // It uses NameHashSHAKE128Base32 to generate a hash which will replace the last few characters.
+// Trailing '-' and '.' characters are removed from the prefix before appending the suffix. This can cause the resulting string to be shorter than maxLen.
 func ShortenToXCharacters(input string, maxLen int) (string, error) {
 	if len(input) <= maxLen {
 		return input, nil
@@ -137,7 +138,7 @@ func ShortenToXCharacters(input string, maxLen int) (string, error) {
 		return "", ErrMaxLenTooSmall
 	}
 
-	return input[:trimLength] + suffix, nil
+	return strings.TrimRight(input[:trimLength], "-.") + suffix, nil
 }
 
 // ShortenToXCharactersUnsafe works like ShortenToXCharacters, but panics instead of returning an error.

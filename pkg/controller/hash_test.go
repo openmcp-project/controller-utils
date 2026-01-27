@@ -2,6 +2,7 @@ package controller
 
 import (
 	"crypto/sha3"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -12,6 +13,8 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+var k8sNameRegex = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`)
 
 func Test_Version8UUID(t *testing.T) {
 	testCases := []struct {
@@ -222,11 +225,18 @@ func Test_ShortenToXCharacters(t *testing.T) {
 			expected: "this-is-a-very-a-very-a-very-long-string-that-is-over--6reoyp5o",
 			maxLen:   63,
 		},
+		{
+			desc:     "badly placed dot",
+			input:    "abcd.efghijklmnopqrstuvwxyz",
+			expected: "abcd--35l3mtbw",
+			maxLen:   15,
+		},
 	}
 	for _, tC := range testCases {
 		t.Run(tC.desc, func(t *testing.T) {
 			actual, err := ShortenToXCharacters(tC.input, tC.maxLen)
 			if tC.expectedErr == nil {
+				assert.True(t, k8sNameRegex.Match([]byte(actual)), "resulting name '%s' is not a valid k8s name", actual)
 				assert.Equal(t, tC.expected, actual)
 				assert.LessOrEqual(t, len(actual), tC.maxLen)
 			} else {
