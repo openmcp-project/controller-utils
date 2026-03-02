@@ -18,7 +18,7 @@ import (
 	"github.com/openmcp-project/controller-utils/pkg/collections/maps"
 )
 
-func applyValidatingWebhook(ctx context.Context, opts *installOptions, obj client.Object) error {
+func applyValidatingWebhook(ctx context.Context, opts *installOptions, obj client.Object, mutate ValidatingMutation) error {
 	gvk, err := apiutil.GVKForObject(obj, opts.scheme)
 	if err != nil {
 		return err
@@ -70,6 +70,12 @@ func applyValidatingWebhook(ctx context.Context, opts *installOptions, obj clien
 			}
 		}
 
+		if mutate != nil {
+			if err := mutate(&webhook); err != nil {
+				return fmt.Errorf("error applying mutation to webhook: %w", err)
+			}
+		}
+
 		cfg.Webhooks = []admissionregistrationv1.ValidatingWebhook{webhook}
 		return nil
 	})
@@ -77,7 +83,7 @@ func applyValidatingWebhook(ctx context.Context, opts *installOptions, obj clien
 	return err
 }
 
-func applyMutatingWebhook(ctx context.Context, opts *installOptions, obj client.Object) error {
+func applyMutatingWebhook(ctx context.Context, opts *installOptions, obj client.Object, mutate MutatingMutation) error {
 	gvk, err := apiutil.GVKForObject(obj, opts.scheme)
 	if err != nil {
 		return err
@@ -126,6 +132,12 @@ func applyMutatingWebhook(ctx context.Context, opts *installOptions, obj client.
 			}
 		} else {
 			webhook.ClientConfig.URL = ptr.To(*opts.customBaseUrl + webhookPath)
+		}
+
+		if mutate != nil {
+			if err := mutate(&webhook); err != nil {
+				return fmt.Errorf("error applying mutation to webhook: %w", err)
+			}
 		}
 
 		cfg.Webhooks = []admissionregistrationv1.MutatingWebhook{webhook}

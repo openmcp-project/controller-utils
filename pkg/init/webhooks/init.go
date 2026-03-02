@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -73,6 +74,21 @@ type APITypes struct {
 	Validator bool
 	// Defaulter indicates whether the type has a mutating webhook.
 	Defaulter bool
+	// Mutation allows to mutate the webhooks before they are created or updated. Use with caution, as it may break the webhooks or interfere with the library's management of the resources.
+	Mutation Mutation
+}
+
+// ValidatingMutation is a function that can be used to mutate the validating webhook before it is created or updated.
+// Use with caution, as it may break the webhook or interfere with the library's management of the webhook.
+type ValidatingMutation func(webhook *admissionregistrationv1.ValidatingWebhook) error
+
+// MutatingMutation is a function that can be used to mutate the mutating webhook before it is created or updated.
+// Use with caution, as it may break the webhook or interfere with the library's management of the webhook.
+type MutatingMutation func(webhook *admissionregistrationv1.MutatingWebhook) error
+
+type Mutation struct {
+	ValidatingWebhook ValidatingMutation
+	MutatingWebhook   MutatingMutation
 }
 
 func Install(
@@ -115,12 +131,12 @@ func Install(
 
 	for _, t := range apiTypes {
 		if t.Validator {
-			if err := applyValidatingWebhook(ctx, opts, t.Obj); err != nil {
+			if err := applyValidatingWebhook(ctx, opts, t.Obj, t.Mutation.ValidatingWebhook); err != nil {
 				return err
 			}
 		}
 		if t.Defaulter {
-			if err := applyMutatingWebhook(ctx, opts, t.Obj); err != nil {
+			if err := applyMutatingWebhook(ctx, opts, t.Obj, t.Mutation.MutatingWebhook); err != nil {
 				return err
 			}
 		}
