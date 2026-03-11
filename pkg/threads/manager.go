@@ -40,6 +40,7 @@ func NewThreadManager(mgrCtx context.Context, onFinish OnFinishFunc) *ThreadMana
 		runOnStart:        map[string]*Thread{},
 		mgrStop:           mgrCtx.Done(),
 		threadCancelFuncs: map[string]context.CancelFunc{},
+		notifyOnStop:      make(chan struct{}),
 	}
 }
 
@@ -54,6 +55,7 @@ type ThreadManager struct {
 	stopped           atomic.Bool                   // indicates if the ThreadManager is stopped
 	waitForThreads    sync.WaitGroup                // used to wait for threads to finish when stopping the ThreadManager
 	threadCancelFuncs map[string]context.CancelFunc // map of thread ids to cancel functions
+	notifyOnStop      chan struct{}                 // channel is closed when the ThreadManager is stopped, used for Wait()
 }
 
 // Start starts the ThreadManager.
@@ -137,6 +139,7 @@ func (tm *ThreadManager) stop() {
 	tm.lockThreadMap.Unlock()
 
 	tm.waitForThreads.Wait()
+	close(tm.notifyOnStop)
 	close(tm.returns)
 	tm.log.Info("ThreadManager stopped")
 }
@@ -187,9 +190,7 @@ func (tm *ThreadManager) run(t *Thread) {
 	}
 	tm.threadCancelFuncs[t.id] = t.cancel
 	tm.lockThreadMap.Unlock()
-	tm.waitForThreads.Add(1)
-	go func() {
-		defer tm.waitForThreads.Done()
+	tm.waitForThreads.Go(func() {
 		var err error
 		if t.work != nil {
 			err = t.work(t.ctx)
@@ -216,7 +217,7 @@ func (tm *ThreadManager) run(t *Thread) {
 		}
 		tm.returns <- tr
 		tm.log.Debug("Thread finished", "thread", t.id)
-	}()
+	})
 }
 
 func (tm *ThreadManager) isStarted() bool {
@@ -242,6 +243,15 @@ func (tm *ThreadManager) IsStopped() bool {
 // This is a convenience function that is equivalent to calling IsStarted() && !IsStopped().
 func (tm *ThreadManager) IsRunning() bool {
 	return tm.IsStarted() && !tm.IsStopped()
+}
+
+// Wait blocks until the ThreadManager has been stopped and all threads have finished.
+// Returns immediately if the ThreadManager has not been started yet.
+func (tm *ThreadManager) Wait() {
+	if !tm.IsStarted() {
+		return
+	}
+	<-tm.notifyOnStop
 }
 
 var _ OnFinishFunc = (*ThreadManager)(nil).Restart

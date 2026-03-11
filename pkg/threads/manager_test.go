@@ -133,6 +133,28 @@ var _ = Describe("ThreadManager", func() {
 			Expect(time.Now()).To(BeTemporally("<", now.Add(3*time.Second)))
 		})
 
+		It("should wait until all tasks are finished and the ThreadManager is stopped when calling Wait", func() {
+			now := time.Now()
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			mgr := threads.NewThreadManager(ctx, nil)
+			mgr.Wait() // should return immediately if the manager is not started
+			Expect(time.Now()).To(BeTemporally("<", now.Add(time.Second)))
+			mgr.Run(context.Background(), "sleep1", func(ctx context.Context) error {
+				select {
+				case <-ctx.Done():
+					return nil
+				case <-time.After(10 * time.Second):
+					return nil
+				}
+			}, nil)
+			mgr.Start()
+			mgr.Wait()
+			finishTime := time.Now()
+			Expect(finishTime).To(BeTemporally(">", now.Add(3*time.Second)))
+			Expect(finishTime).To(BeTemporally("<", now.Add(5*time.Second)))
+		})
+
 		It("should cancel a thread if another one with the same id is started", func() {
 			mgr := threads.NewThreadManager(context.Background(), nil)
 			now := time.Now()
