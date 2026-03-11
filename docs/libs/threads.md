@@ -23,7 +23,10 @@ The most relevant use-case for this library in the context of k8s controllers is
 		- This is a blocking method that waits for all remaining go routines to finish. Their context is cancelled to notify them of the manager being stopped.
 	- Cancel the context that was passed into `NewThreadManager` as the first argument.
 	- Send a `SIGTERM` or `SIGINT` signal to the process.
-- The `TaskManager`'s `Restart`, `RestartOnError`, and `RestartOnSuccess` methods are pre-defined on-finish functions. They are not meant to be used directly, but instead be used as an argument to `Run`. See the example below.
+- The `ThreadManager`'s `Wait` method can be used to wait until the manager has been stopped and all of its tasks have finished their execution.
+	- Since this method is blocking, the thread that calls it cannot stop the manager itself. It has to be stopped by some other means (e.g. `SIGINT`/`SIGTERM`) or from another thread.
+	- When all currently running threads of a thread manager have finished, the manager is _not_ considered stop (because new threads could be run with it) and `Wait` will not unblock until one of the stopping conditions described above has been met.
+- The `ThreadManager`'s `Restart`, `RestartOnError`, and `RestartOnSuccess` methods are pre-defined on-finish functions. They are not meant to be used directly, but instead be used as an argument to `Run`. See the example below.
 
 ### Examples
 
