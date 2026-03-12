@@ -116,6 +116,10 @@ func (tm *ThreadManager) Start() {
 // Adding threads after the ThreadManager has been stopped is a no-op.
 // The ThreadManager is also stopped when the context passed to the ThreadManager during creation is cancelled or when a SIGINT or SIGTERM signal is received.
 func (tm *ThreadManager) Stop() {
+	if tm.IsStopped() {
+		tm.log.Debug("Stop called, but ThreadManager is already stopped, nothing to do")
+		return
+	}
 	tm.lock.Lock()
 	defer tm.lock.Unlock()
 	if !tm.isStarted() {
@@ -125,7 +129,7 @@ func (tm *ThreadManager) Stop() {
 }
 
 func (tm *ThreadManager) stop() {
-	if tm.stopped.Load() {
+	if tm.IsStopped() {
 		tm.log.Debug("Stop called, but ThreadManager is already stopped, nothing to do")
 		return
 	}
