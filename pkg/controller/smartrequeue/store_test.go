@@ -96,7 +96,7 @@ func TestFor(t *testing.T) {
 			entry1 := store.For(tt.firstObj)
 
 			assert.NotNil(t, entry1, "Expected entry to be created")
-			result, err := entry1.Backoff()
+			result, err := entry1.IsStable()
 			require.NoError(t, err)
 			assert.Equal(t, 1*time.Second, getRequeueAfter(result, err))
 
@@ -176,7 +176,7 @@ func TestConcurrentAccess(t *testing.T) {
 			defer wg.Done()
 			obj := objects[idx]
 			entry := store.For(obj)
-			_, _ = entry.Backoff() // Just exercise the API
+			_, _ = entry.IsStable() // Just exercise the API
 		}(i)
 	}
 
