@@ -31,13 +31,13 @@ func Example_controllerUsage() {
 		if errOccurred {
 			// Handle error case
 			err := fmt.Errorf("something went wrong")
-			return entry.Error(err)
+			return entry.ReturnError(err)
 		} else if inProgress {
 			// Resource is changing - check back soon
-			return entry.Reset()
+			return entry.IsProgressing()
 		} else {
 			// Resource is stable - gradually back off
-			return entry.Backoff()
+			return entry.IsStable()
 		}
 	}
 

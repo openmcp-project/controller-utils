@@ -34,7 +34,7 @@ func TestEntry_Stable(t *testing.T) {
 		}
 
 		for i, expected := range expectedDurations {
-			result, err := entry.Backoff()
+			result, err := entry.IsStable()
 			require.NoError(t, err)
 			assert.Equal(t, expected, getRequeueAfter(result, err), "Iteration %d should have correct duration", i)
 		}
@@ -49,70 +49,70 @@ func TestEntry_Progressing(t *testing.T) {
 	entry := newEntry(store)
 
 	// Ensure state is not at minimum
-	_, _ = entry.Backoff()
-	_, _ = entry.Backoff()
+	_, _ = entry.IsStable()
+	_, _ = entry.IsStable()
 
 	// Test progressing resets duration to minimum
 	t.Run("resets to minimum interval", func(t *testing.T) {
-		result, err := entry.Reset()
+		result, err := entry.IsProgressing()
 		require.NoError(t, err)
 		assert.Equal(t, minInterval, getRequeueAfter(result, err))
 
 		// Second call should also return min interval with small increment
-		result, err = entry.Reset()
+		result, err = entry.IsProgressing()
 		require.NoError(t, err)
 		assert.Equal(t, minInterval, getRequeueAfter(result, err))
 	})
 
 	// After progressing, Stable should restart exponential backoff
 	t.Run("stable continues from minimum", func(t *testing.T) {
-		result, err := entry.Backoff()
+		result, err := entry.IsStable()
 		require.NoError(t, err)
 		assert.Equal(t, 2*time.Second, getRequeueAfter(result, err))
 
-		result, err = entry.Backoff()
+		result, err = entry.IsStable()
 		require.NoError(t, err)
 		assert.Equal(t, 4*time.Second, getRequeueAfter(result, err))
 	})
 }
 
-func TestEntry_Error(t *testing.T) {
+func TestEntry_ReturnError(t *testing.T) {
 	// Setup
 	store := NewStore(time.Second, time.Minute, 2)
 	entry := newEntry(store)
 	testErr := errors.New("test error")
 
 	// Ensure state is not at minimum
-	_, _ = entry.Backoff()
-	_, _ = entry.Backoff()
+	_, _ = entry.IsStable()
+	_, _ = entry.IsStable()
 
 	// Test error handling
 	t.Run("returns error and resets backoff", func(t *testing.T) {
-		result, err := entry.Error(testErr)
+		result, err := entry.ReturnError(testErr)
 		assert.Equal(t, testErr, err, "Should return the passed error")
 		assert.Equal(t, 0*time.Second, getRequeueAfter(result, err), "Should have zero requeue time")
 	})
 
 	// After error, stable should continue from minimum
 	t.Run("stable continues properly after error", func(t *testing.T) {
-		result, err := entry.Backoff()
+		result, err := entry.IsStable()
 		require.NoError(t, err)
 		assert.Equal(t, time.Second, getRequeueAfter(result, err))
 
-		result, err = entry.Backoff()
+		result, err = entry.IsStable()
 		require.NoError(t, err)
 		assert.Equal(t, 2*time.Second, getRequeueAfter(result, err))
 	})
 }
 
-func TestEntry_Never(t *testing.T) {
+func TestEntry_StopRequeue(t *testing.T) {
 	// Setup
 	store := NewStore(time.Second, time.Minute, 2)
 	entry := newEntry(store)
 
-	// Test Never behavior
+	// Test StopRequeue behavior
 	t.Run("returns empty result", func(t *testing.T) {
-		result, err := entry.Never()
+		result, err := entry.StopRequeue()
 		require.NoError(t, err)
 		assert.Equal(t, time.Duration(0), getRequeueAfter(result, err))
 	})

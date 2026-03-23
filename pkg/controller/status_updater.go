@@ -301,7 +301,7 @@ func (s *statusUpdater[Obj]) UpdateStatus(ctx context.Context, c client.Client, 
 	if s.smartRequeueStore != nil {
 		var srRes ctrl.Result
 		if rr.ReconcileError != nil {
-			srRes, _ = s.smartRequeueStore.For(rr.Object).Error(rr.ReconcileError)
+			srRes, _ = s.smartRequeueStore.For(rr.Object).ReturnError(rr.ReconcileError)
 		} else {
 			for _, srcFunc := range s.smartRequeueConditionals {
 				if srcFunc != nil {
@@ -310,11 +310,11 @@ func (s *statusUpdater[Obj]) UpdateStatus(ctx context.Context, c client.Client, 
 			}
 			switch rr.SmartRequeue {
 			case SR_BACKOFF:
-				srRes, _ = s.smartRequeueStore.For(rr.Object).Backoff()
+				srRes, _ = s.smartRequeueStore.For(rr.Object).IsStable()
 			case SR_RESET:
-				srRes, _ = s.smartRequeueStore.For(rr.Object).Reset()
+				srRes, _ = s.smartRequeueStore.For(rr.Object).IsProgressing()
 			case SR_NO_REQUEUE:
-				srRes, _ = s.smartRequeueStore.For(rr.Object).Never()
+				srRes, _ = s.smartRequeueStore.For(rr.Object).StopRequeue()
 			}
 		}
 		if srRes.RequeueAfter > 0 && (rr.Result.RequeueAfter == 0 || srRes.RequeueAfter < rr.Result.RequeueAfter) {

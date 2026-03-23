@@ -20,15 +20,17 @@ func newEntry(s *Store) *Entry {
 	}
 }
 
-// Error resets the duration to the minInterval and returns an empty Result and the error
-// so that the controller-runtime can handle the exponential backoff for errors.
-func (e *Entry) Error(err error) (ctrl.Result, error) {
+// ReturnError resets the backoff to minInterval and returns the given error,
+// delegating backoff handling to controller-runtime.
+func (e *Entry) ReturnError(err error) (ctrl.Result, error) {
 	e.nextDuration = e.store.minInterval
 	return ctrl.Result{}, err
 }
 
-// Backoff returns a Result and increments the interval for the next iteration.
-func (e *Entry) Backoff() (ctrl.Result, error) {
+// IsStable indicates the resource has reached its desired state. It requeues after
+// the current interval and increases the interval for the next call, implementing
+// exponential backoff.
+func (e *Entry) IsStable() (ctrl.Result, error) {
 	// Save current duration for result
 	current := e.nextDuration
 
@@ -38,15 +40,17 @@ func (e *Entry) Backoff() (ctrl.Result, error) {
 	return ctrl.Result{RequeueAfter: current}, nil
 }
 
-// Reset resets the duration to the minInterval and returns a Result with that interval.
-func (e *Entry) Reset() (ctrl.Result, error) {
+// IsProgressing indicates the resource is actively changing. It resets the backoff
+// to minInterval and requeues after that interval.
+func (e *Entry) IsProgressing() (ctrl.Result, error) {
 	e.nextDuration = e.store.minInterval
 	defer e.setNext()
 	return ctrl.Result{RequeueAfter: e.nextDuration}, nil
 }
 
-// Never deletes the entry from the store and returns an empty Result.
-func (e *Entry) Never() (ctrl.Result, error) {
+// StopRequeue removes the entry from the store and returns an empty result,
+// stopping further requeues for this object.
+func (e *Entry) StopRequeue() (ctrl.Result, error) {
 	e.store.deleteEntry(e)
 	return ctrl.Result{}, nil
 }
