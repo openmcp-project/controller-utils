@@ -67,6 +67,8 @@ func (m *SecretMutator) Empty() *core.Secret {
 	return s
 }
 
+// Mutate sets the Type field explicitly to ensure correctness with CreateOrUpdate patterns.
+// Kubernetes does not enforce Secret.Type as immutable (see pkg/registry/core/secret/strategy.go).
 func (m *SecretMutator) Mutate(s *core.Secret) error {
 	s.Type = m.Type
 	if m.Data != nil {
