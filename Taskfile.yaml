@@ -9,3 +9,4 @@ includes:
       API_DIRS: '{{.ROOT_DIR}}/api/...'
       CODE_DIRS: '{{.ROOT_DIR}}/pkg/... {{.ROOT_DIR}}/api/...'
       GENERATE_DOCS_INDEX: "true"
+      MANIFEST_OUT: ""
