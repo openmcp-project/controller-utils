@@ -68,6 +68,7 @@ func (m *SecretMutator) Empty() *core.Secret {
 }
 
 func (m *SecretMutator) Mutate(s *core.Secret) error {
+	s.Type = m.Type
 	if m.Data != nil {
 		s.Data = make(map[string][]byte, len(m.Data))
 		maps.Copy(s.Data, m.Data)

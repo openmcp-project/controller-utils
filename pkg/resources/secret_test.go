@@ -118,4 +118,20 @@ var _ = Describe("SecretMutator", func() {
 		Expect(fakeClient.Get(ctx, client.ObjectKey{Name: "test-secret", Namespace: "test-namespace"}, retrievedSecret)).To(Succeed())
 		Expect(retrievedSecret).To(Equal(secret))
 	})
+
+	It("should set Type field when mutating an existing secret", func() {
+		// Create a mutator with DockerConfigJson type
+		mutator = resources.NewSecretMutator("test-secret", "test-namespace", data, core.SecretTypeDockerConfigJson)
+
+		// Create an existing secret with default Opaque type (simulating pre-existing secret)
+		existingSecret := &core.Secret{
+			Type: core.SecretTypeOpaque,
+		}
+
+		// Apply the mutator
+		Expect(mutator.Mutate(existingSecret)).To(Succeed())
+
+		// Verify that the Type field is updated
+		Expect(existingSecret.Type).To(Equal(core.SecretTypeDockerConfigJson))
+	})
 })
