@@ -40,12 +40,24 @@ func (e *Entry) IsStable() (ctrl.Result, error) {
 	return ctrl.Result{RequeueAfter: current}, nil
 }
 
+// RequeueWithBackoff requeues after the current interval and increases the interval for the next call.
+// It is an alias for IsStable.
+func (e *Entry) RequeueWithBackoff() (ctrl.Result, error) {
+	return e.IsStable()
+}
+
 // IsProgressing indicates the resource is actively changing. It resets the backoff
 // to minInterval and requeues after that interval.
 func (e *Entry) IsProgressing() (ctrl.Result, error) {
 	e.nextDuration = e.store.minInterval
 	defer e.setNext()
 	return ctrl.Result{RequeueAfter: e.nextDuration}, nil
+}
+
+// RequeueWithReset requeues after the minimum interval and resets the backoff for the next call.
+// It is an alias for IsProgressing.
+func (e *Entry) RequeueWithReset() (ctrl.Result, error) {
+	return e.IsProgressing()
 }
 
 // StopRequeue removes the entry from the store and returns an empty result,
