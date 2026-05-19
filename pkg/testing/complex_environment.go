@@ -259,7 +259,7 @@ func (eb *ComplexEnvironmentBuilder) WithReconciler(name string, reconciler reco
 	if !ok {
 		eb.Reconcilers[name] = &ReconcilerEnvironment{}
 	}
-	eb.Reconcilers[name].Reconciler = reconciler
+	eb.Reconcilers[name].Reconciler = WrapReconcilerWithLoggingMetadata(name, reconciler)
 	return eb
 }
 
@@ -271,7 +271,9 @@ func (eb *ComplexEnvironmentBuilder) WithReconcilerConstructor(name string, cons
 	if !ok {
 		eb.Reconcilers[name] = &ReconcilerEnvironment{}
 	}
-	eb.Reconcilers[name].ReconcilerConstructor = constructor
+	eb.Reconcilers[name].ReconcilerConstructor = func(c ...client.Client) reconcile.Reconciler {
+		return WrapReconcilerWithLoggingMetadata(name, constructor(c...))
+	}
 	eb.Reconcilers[name].Targets = targets
 	return eb
 }
@@ -319,9 +321,12 @@ func (eb *ComplexEnvironmentBuilder) Build() *ComplexEnvironment {
 
 	// initialize logger
 	if !eb.loggerIsSet {
-		log, err := logging.GetLogger()
+		log, err := logging.New(&logging.Config{
+			Development: true,
+			Cli:         true,
+		})
 		if err != nil {
-			panic(fmt.Errorf("error getting logger: %w", err))
+			panic(fmt.Errorf("error creating logger: %w", err))
 		}
 		res.Log = log
 	}
@@ -453,4 +458,34 @@ func InjectUIDOnObjectCreation(additionalLogic func(ctx context.Context, client 
 		}
 		return client.Create(ctx, obj, opts...)
 	}
+}
+
+// WrapReconcilerWithLoggingMetadata wraps the given reconciler with a helper struct that injects additional metadata into the context's logger when 'Reconcile' is called.
+// This mimics the controller-runtime's behavior of adding additional metadata to the logger, such as name and namespace of the reconciled object.
+// This function is applied to all reconcilers that are passed into the builder's 'WithReconciler' or 'WithReconcilerConstructor' methods, so it usually does not need to be called manually.
+func WrapReconcilerWithLoggingMetadata(name string, reconciler reconcile.Reconciler) reconcile.Reconciler {
+	if _, ok := reconciler.(*reconcilerWithLoggingMetadata); ok {
+		// avoid double-wrapping
+		return reconciler
+	}
+	return &reconcilerWithLoggingMetadata{
+		name:     name,
+		internal: reconciler,
+	}
+}
+
+type reconcilerWithLoggingMetadata struct {
+	name     string
+	internal reconcile.Reconciler
+}
+
+var _ reconcile.Reconciler = (*reconcilerWithLoggingMetadata)(nil)
+
+func (r *reconcilerWithLoggingMetadata) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+	log, err := logging.FromContext(ctx)
+	if err == nil {
+		log = log.WithValues("controller", r.name, "namespace", req.Namespace, "name", req.Name, "reconcileID", string(uuid.NewUUID()))
+		ctx = logging.NewContext(ctx, log)
+	}
+	return r.internal.Reconcile(ctx, req)
 }
