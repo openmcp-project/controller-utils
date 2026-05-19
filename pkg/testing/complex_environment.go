@@ -489,3 +489,43 @@ func (r *reconcilerWithLoggingMetadata) Reconcile(ctx context.Context, req recon
 	}
 	return r.internal.Reconcile(ctx, req)
 }
+
+// ReconcilerAs takes either an *Environment, a *ComplexEnvironment, or a reconcile.Reconciler directly.
+// In case of an environment, it fetches the reconciler with the given name from the environment first.
+// In any case, it is unwrapped if of type *reconcilerWithLoggingMetadata, and then cast to the expected type T.
+// Returns an error if the reconciler is not found or cannot be cast to the requested type.
+// Panics if maybeName is not empty for an *Environment or reconcile.Reconciler, or has not exactly one element for a *ComplexEnvironment.
+func ReconcilerAs[T reconcile.Reconciler](env any, maybeName ...string) (T, error) {
+	var zero T
+	var r reconcile.Reconciler
+	switch e := env.(type) {
+	case *Environment:
+		if len(maybeName) != 0 {
+			panic(fmt.Errorf("maybeName must be empty for *Environment, got %v", maybeName))
+		}
+		r = e.Reconcilers[SimpleEnvironmentDefaultKey]
+	case *ComplexEnvironment:
+		if len(maybeName) != 1 {
+			panic(fmt.Errorf("ReconcilerAs: maybeName must have exactly one element for *ComplexEnvironment, got %v", maybeName))
+		}
+		r = e.Reconcilers[maybeName[0]]
+	case reconcile.Reconciler:
+		if len(maybeName) != 0 {
+			panic(fmt.Errorf("maybeName must be empty for reconcile.Reconciler, got %v", maybeName))
+		}
+		r = e
+	default:
+		panic(fmt.Errorf("env must either *Environment, *ComplexEnvironment, or reconcile.Reconciler, got %T", env))
+	}
+	if r == nil {
+		return zero, fmt.Errorf("reconciler not found")
+	}
+	if wrapped, ok := r.(*reconcilerWithLoggingMetadata); ok {
+		r = wrapped.internal
+	}
+	typed, ok := r.(T)
+	if !ok {
+		return zero, fmt.Errorf("reconciler of type %T is not assignable to target of type %T", r, zero)
+	}
+	return typed, nil
+}
