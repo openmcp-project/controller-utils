@@ -218,7 +218,7 @@ var _ = Describe("Readiness Check", func() {
 			Status: gatewayv1.GatewayStatus{
 				Conditions: []metav1.Condition{
 					{
-						Type:   string(gatewayv1.GatewayConditionReady),
+						Type:   string(gatewayv1.GatewayConditionReady), // nolint:staticcheck
 						Status: "True",
 					},
 				},

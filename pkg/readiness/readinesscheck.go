@@ -93,7 +93,7 @@ func CheckIngress(ingress *networkingv1.Ingress) CheckResult {
 // CheckGateway checks the readiness of a Kubernetes Gateway.
 func CheckGateway(gateway *gatewayv1.Gateway) CheckResult {
 	for _, condition := range gateway.Status.Conditions {
-		if condition.Type == string(gatewayv1.GatewayConditionReady) && condition.Status == "True" {
+		if condition.Type == string(gatewayv1.GatewayConditionReady) && condition.Status == "True" { // nolint:staticcheck // I have no idea how to keep this method without using the 'deprecated' condition type.
 			return NewReadyResult()
 		}
 	}

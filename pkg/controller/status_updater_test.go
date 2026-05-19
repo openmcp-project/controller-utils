@@ -17,7 +17,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/scheme"
 
 	"github.com/openmcp-project/controller-utils/pkg/controller"
 	"github.com/openmcp-project/controller-utils/pkg/errors"
@@ -532,7 +531,10 @@ func (in *CustomObjectList) DeepCopyObject() runtime.Object {
 }
 
 func init() {
-	SchemeBuilder.Register(&CustomObject{}, &CustomObjectList{})
+	SchemeBuilder.Register(func(s *runtime.Scheme) error {
+		s.AddKnownTypes(GroupVersion, &CustomObject{}, &CustomObjectList{})
+		return nil
+	})
 	coScheme = runtime.NewScheme()
 	err := SchemeBuilder.AddToScheme(coScheme)
 	if err != nil {
@@ -545,5 +547,5 @@ var (
 	GroupVersion = schema.GroupVersion{Group: "testing.openmcp.cloud", Version: "v1alpha1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
-	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
+	SchemeBuilder = runtime.NewSchemeBuilder()
 )
