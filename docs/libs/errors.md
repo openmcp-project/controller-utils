@@ -8,3 +8,6 @@ The `pkg/errors` package contains the `ReasonableError` type, which combines a n
 - `Errorf(...)` can be used to wrap an existing `ReasonableError` together with a new error, similarly to how `fmt.Errorf(...)` does it for standard errors.
 - `NewReasonableErrorList(...)` or `Join(...)` can be used to work with lists of errors. `Aggregate()` turns them into a single error again.
 
+### Ignore Invalid User Input
+
+`ErrInvalidUserInput` can be used to create errors that can be ignored with `IgnoreInvalidUserInput(...)` at the end of reconciliation. This allows you to handle errors properly and skip unnecessary requeues.
