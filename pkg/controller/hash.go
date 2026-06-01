@@ -44,6 +44,7 @@ func version8UUID(data []byte) (uuid.UUID, error) {
 // K8sNameUUID takes any number of string arguments and computes a hash out of it, which is then formatted as a version 8 UUID.
 // The arguments are joined with '/' before being hashed.
 // Returns an error if the list of ids is empty or contains only empty strings.
+//
 // Deprecated: Use NameHashSHAKE128Base32 instead.
 func K8sNameUUID(names ...string) (string, error) {
 	if err := validateIDs(names); err != nil {
@@ -69,6 +70,7 @@ func validateIDs(names []string) error {
 
 // K8sNameUUIDUnsafe works like K8sNameUUID, but panics instead of returning an error.
 // This should only be used in places where the input is guaranteed to be valid.
+//
 // Deprecated: Use NameHashSHAKE128Base32 instead.
 func K8sNameUUIDUnsafe(names ...string) string {
 	uuid, err := K8sNameUUID(names...)
@@ -80,6 +82,7 @@ func K8sNameUUIDUnsafe(names ...string) string {
 
 // K8sObjectUUID takes a client object and computes a hash out of the namespace and name, which is then formatted as a version 8 UUID.
 // An empty namespace will be replaced by "default".
+//
 // Deprecated: Use ObjectHashSHAKE128Base32 instead.
 func K8sObjectUUID(obj client.Object) (string, error) {
 	name, namespace := obj.GetName(), obj.GetNamespace()
@@ -91,6 +94,7 @@ func K8sObjectUUID(obj client.Object) (string, error) {
 
 // K8sObjectUUIDUnsafe works like K8sObjectUUID, but panics instead of returning an error.
 // This should only be used in places where the input is guaranteed to be valid.
+//
 // Deprecated: Use ObjectHashSHAKE128Base32 instead.
 func K8sObjectUUIDUnsafe(obj client.Object) string {
 	uuid, err := K8sObjectUUID(obj)
