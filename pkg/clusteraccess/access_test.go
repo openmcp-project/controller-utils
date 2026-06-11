@@ -1,6 +1,7 @@
 package clusteraccess_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -9,12 +10,15 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 
 	"github.com/openmcp-project/controller-utils/pkg/clusteraccess"
 	"github.com/openmcp-project/controller-utils/pkg/pairs"
@@ -310,7 +314,33 @@ var _ = Describe("ClusterAccess", func() {
 			Expect(err).To(HaveOccurred())
 		})
 
-		It("should update the rolebinding if it exists and has the expected labels", func() {
+		It("should update the rolebinding if it exists and has the expected labels (roleRef unchanged)", func() {
+			rb := &rbacv1.RoleBinding{}
+			rb.SetName("testrb")
+			rb.SetNamespace("testns")
+			rb.SetLabels(testLabelsMap)
+			rb.RoleRef = expectedRoleRef()
+			rb.Subjects = []rbacv1.Subject{
+				{
+					Kind:      rbacv1.ServiceAccountKind,
+					Name:      "bar",
+					Namespace: "testns",
+				},
+			}
+			env := testutils.NewEnvironmentBuilder().WithFakeClient(nil).WithFakeClientBuilderCall("WithInterceptorFuncs", fakeClientRoleRefImmutabilityInterceptor()).WithInitObjects(rb, dummyRole(), dummyServiceAccount()).Build()
+			Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(rb), rb)).To(Succeed())
+			Expect(rb.Labels).To(BeEquivalentTo(testLabelsMap))
+			oldUID := rb.GetUID()
+			rb, err := clusteraccess.EnsureRoleBinding(env.Ctx, env.Client(), rb.Name, rb.Namespace, expectedRoleRef().Name, expectedSubjects(), testLabelsList...)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(rb), rb)).To(Succeed())
+			Expect(rb.Labels).To(BeEquivalentTo(testLabelsMap))
+			Expect(rb.RoleRef).To(BeEquivalentTo(expectedRoleRef()))
+			Expect(rb.Subjects).To(BeEquivalentTo(expectedSubjects()))
+			Expect(rb.GetUID()).To(Equal(oldUID), "rolebinding should have been updated, not recreated")
+		})
+
+		It("should update the rolebinding if it exists and has the expected labels (roleRef changed, deletion succeeds)", func() {
 			rb := &rbacv1.RoleBinding{}
 			rb.SetName("testrb")
 			rb.SetNamespace("testns")
@@ -327,15 +357,56 @@ var _ = Describe("ClusterAccess", func() {
 					Namespace: "testns",
 				},
 			}
-			env := testutils.NewEnvironmentBuilder().WithFakeClient(nil).WithInitObjects(rb, dummyRole(), dummyServiceAccount()).Build()
+			env := testutils.NewEnvironmentBuilder().WithFakeClient(nil).WithFakeClientBuilderCall("WithInterceptorFuncs", fakeClientRoleRefImmutabilityInterceptor()).WithInitObjects(rb, dummyRole(), dummyServiceAccount()).Build()
 			Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(rb), rb)).To(Succeed())
 			Expect(rb.Labels).To(BeEquivalentTo(testLabelsMap))
+			oldUID := rb.GetUID()
 			rb, err := clusteraccess.EnsureRoleBinding(env.Ctx, env.Client(), rb.Name, rb.Namespace, expectedRoleRef().Name, expectedSubjects(), testLabelsList...)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(rb), rb)).To(Succeed())
 			Expect(rb.Labels).To(BeEquivalentTo(testLabelsMap))
 			Expect(rb.RoleRef).To(BeEquivalentTo(expectedRoleRef()))
 			Expect(rb.Subjects).To(BeEquivalentTo(expectedSubjects()))
+			Expect(rb.GetUID()).ToNot(Equal(oldUID), "rolebinding should have been recreated due to roleRef change")
+		})
+
+		It("should update the rolebinding if it exists and has the expected labels (roleRef changed, deletion blocked)", func() {
+			rb := &rbacv1.RoleBinding{}
+			rb.SetName("testrb")
+			rb.SetNamespace("testns")
+			rb.SetLabels(testLabelsMap)
+			rb.SetFinalizers([]string{"deletion-blocker"})
+			rb.RoleRef = rbacv1.RoleRef{
+				APIGroup: rbacv1.SchemeGroupVersion.Group,
+				Name:     "foo",
+				Kind:     "Role",
+			}
+			rb.Subjects = []rbacv1.Subject{
+				{
+					Kind:      rbacv1.ServiceAccountKind,
+					Name:      "bar",
+					Namespace: "testns",
+				},
+			}
+			env := testutils.NewEnvironmentBuilder().WithFakeClient(nil).WithFakeClientBuilderCall("WithInterceptorFuncs", fakeClientRoleRefImmutabilityInterceptor()).WithInitObjects(rb, dummyRole(), dummyServiceAccount()).Build()
+			Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(rb), rb)).To(Succeed())
+			Expect(rb.Labels).To(BeEquivalentTo(testLabelsMap))
+			oldUID := rb.GetUID()
+			_, err := clusteraccess.EnsureRoleBinding(env.Ctx, env.Client(), rb.Name, rb.Namespace, expectedRoleRef().Name, expectedSubjects(), testLabelsList...)
+			Expect(err).To(MatchError(clusteraccess.IsWaitingForRecreationError, "IsWaitingForRecreationError"))
+
+			// remove finalizer and try again, should succeed now
+			Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(rb), rb)).To(Succeed())
+			rb.SetFinalizers(nil)
+			Expect(env.Client().Update(env.Ctx, rb)).To(Succeed())
+
+			rb, err = clusteraccess.EnsureRoleBinding(env.Ctx, env.Client(), rb.Name, rb.Namespace, expectedRoleRef().Name, expectedSubjects(), testLabelsList...)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(rb), rb)).To(Succeed())
+			Expect(rb.Labels).To(BeEquivalentTo(testLabelsMap))
+			Expect(rb.RoleRef).To(BeEquivalentTo(expectedRoleRef()))
+			Expect(rb.Subjects).To(BeEquivalentTo(expectedSubjects()))
+			Expect(rb.GetUID()).ToNot(Equal(oldUID), "rolebinding should have been recreated due to roleRef change")
 		})
 
 		It("should create a clusterrolebinding if it does not exist", func() {
@@ -365,7 +436,32 @@ var _ = Describe("ClusterAccess", func() {
 			Expect(err).To(HaveOccurred())
 		})
 
-		It("should update the clusterrolebinding if it exists and has the expected labels", func() {
+		It("should update the clusterrolebinding if it exists and has the expected labels (roleRef unchanged)", func() {
+			crb := &rbacv1.ClusterRoleBinding{}
+			crb.SetName("testcrb")
+			crb.SetLabels(testLabelsMap)
+			crb.RoleRef = expectedClusterRoleRef()
+			crb.Subjects = []rbacv1.Subject{
+				{
+					Kind:      rbacv1.ServiceAccountKind,
+					Name:      "bar",
+					Namespace: "testns",
+				},
+			}
+			env := testutils.NewEnvironmentBuilder().WithFakeClient(nil).WithFakeClientBuilderCall("WithInterceptorFuncs", fakeClientRoleRefImmutabilityInterceptor()).WithInitObjects(crb, dummyClusterRole(), dummyServiceAccount()).Build()
+			Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(crb), crb)).To(Succeed())
+			Expect(crb.Labels).To(BeEquivalentTo(testLabelsMap))
+			oldUID := crb.GetUID()
+			crb, err := clusteraccess.EnsureClusterRoleBinding(env.Ctx, env.Client(), crb.Name, expectedClusterRoleRef().Name, expectedSubjects(), testLabelsList...)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(crb), crb)).To(Succeed())
+			Expect(crb.Labels).To(BeEquivalentTo(testLabelsMap))
+			Expect(crb.RoleRef).To(BeEquivalentTo(expectedClusterRoleRef()))
+			Expect(crb.Subjects).To(BeEquivalentTo(expectedSubjects()))
+			Expect(crb.GetUID()).To(Equal(oldUID), "clusterrolebinding should have been updated, not recreated")
+		})
+
+		It("should update the clusterrolebinding if it exists and has the expected labels (roleRef changed, deletion succeeds)", func() {
 			crb := &rbacv1.ClusterRoleBinding{}
 			crb.SetName("testcrb")
 			crb.SetLabels(testLabelsMap)
@@ -381,15 +477,55 @@ var _ = Describe("ClusterAccess", func() {
 					Namespace: "testns",
 				},
 			}
-			env := testutils.NewEnvironmentBuilder().WithFakeClient(nil).WithInitObjects(crb, dummyClusterRole(), dummyServiceAccount()).Build()
+			env := testutils.NewEnvironmentBuilder().WithFakeClient(nil).WithFakeClientBuilderCall("WithInterceptorFuncs", fakeClientRoleRefImmutabilityInterceptor()).WithInitObjects(crb, dummyClusterRole(), dummyServiceAccount()).Build()
 			Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(crb), crb)).To(Succeed())
 			Expect(crb.Labels).To(BeEquivalentTo(testLabelsMap))
+			oldUID := crb.GetUID()
 			crb, err := clusteraccess.EnsureClusterRoleBinding(env.Ctx, env.Client(), crb.Name, expectedClusterRoleRef().Name, expectedSubjects(), testLabelsList...)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(crb), crb)).To(Succeed())
 			Expect(crb.Labels).To(BeEquivalentTo(testLabelsMap))
 			Expect(crb.RoleRef).To(BeEquivalentTo(expectedClusterRoleRef()))
 			Expect(crb.Subjects).To(BeEquivalentTo(expectedSubjects()))
+			Expect(crb.GetUID()).ToNot(Equal(oldUID), "clusterrolebinding should have been recreated due to roleRef change")
+		})
+
+		It("should update the clusterrolebinding if it exists and has the expected labels (roleRef changed, deletion blocked)", func() {
+			crb := &rbacv1.ClusterRoleBinding{}
+			crb.SetName("testcrb")
+			crb.SetLabels(testLabelsMap)
+			crb.SetFinalizers([]string{"deletion-blocker"})
+			crb.RoleRef = rbacv1.RoleRef{
+				APIGroup: rbacv1.SchemeGroupVersion.Group,
+				Name:     "foo",
+				Kind:     "ClusterRole",
+			}
+			crb.Subjects = []rbacv1.Subject{
+				{
+					Kind:      rbacv1.ServiceAccountKind,
+					Name:      "bar",
+					Namespace: "testns",
+				},
+			}
+			env := testutils.NewEnvironmentBuilder().WithFakeClient(nil).WithFakeClientBuilderCall("WithInterceptorFuncs", fakeClientRoleRefImmutabilityInterceptor()).WithInitObjects(crb, dummyClusterRole(), dummyServiceAccount()).Build()
+			Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(crb), crb)).To(Succeed())
+			Expect(crb.Labels).To(BeEquivalentTo(testLabelsMap))
+			oldUID := crb.GetUID()
+			_, err := clusteraccess.EnsureClusterRoleBinding(env.Ctx, env.Client(), crb.Name, expectedClusterRoleRef().Name, expectedSubjects(), testLabelsList...)
+			Expect(err).To(MatchError(clusteraccess.IsWaitingForRecreationError, "IsWaitingForRecreationError"))
+
+			// remove finalizer and try again, should succeed now
+			Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(crb), crb)).To(Succeed())
+			crb.SetFinalizers(nil)
+			Expect(env.Client().Update(env.Ctx, crb)).To(Succeed())
+
+			crb, err = clusteraccess.EnsureClusterRoleBinding(env.Ctx, env.Client(), crb.Name, expectedClusterRoleRef().Name, expectedSubjects(), testLabelsList...)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(env.Client().Get(env.Ctx, client.ObjectKeyFromObject(crb), crb)).To(Succeed())
+			Expect(crb.Labels).To(BeEquivalentTo(testLabelsMap))
+			Expect(crb.RoleRef).To(BeEquivalentTo(expectedClusterRoleRef()))
+			Expect(crb.Subjects).To(BeEquivalentTo(expectedSubjects()))
+			Expect(crb.GetUID()).ToNot(Equal(oldUID), "clusterrolebinding should have been recreated due to roleRef change")
 		})
 
 	})
@@ -531,3 +667,35 @@ var _ = Describe("ClusterAccess", func() {
 	})
 
 })
+
+func fakeClientRoleRefImmutabilityInterceptor() interceptor.Funcs {
+	return interceptor.Funcs{
+		Create: testutils.InjectUIDOnObjectCreation(nil), // UUIDs can be used to verify whether an object has been recreated
+		Update: func(ctx context.Context, c client.WithWatch, obj client.Object, opts ...client.UpdateOption) error {
+			// mimick the regular client's behavior of rejecting updates to the roleRef of a RoleBinding or ClusterRoleBinding
+			switch o := obj.(type) {
+			case *rbacv1.RoleBinding:
+				old := &rbacv1.RoleBinding{}
+				if err := c.Get(ctx, client.ObjectKeyFromObject(o), old); err != nil {
+					return err
+				}
+				if !equality.Semantic.DeepEqual(old.RoleRef, o.RoleRef) {
+					return apierrors.NewInvalid(rbacv1.SchemeGroupVersion.WithKind("RoleBinding").GroupKind(), o.Name, field.ErrorList{
+						field.Invalid(field.NewPath("roleRef"), o.RoleRef, "cannot be updated"),
+					})
+				}
+			case *rbacv1.ClusterRoleBinding:
+				old := &rbacv1.ClusterRoleBinding{}
+				if err := c.Get(ctx, client.ObjectKeyFromObject(o), old); err != nil {
+					return err
+				}
+				if !equality.Semantic.DeepEqual(old.RoleRef, o.RoleRef) {
+					return apierrors.NewInvalid(rbacv1.SchemeGroupVersion.WithKind("ClusterRoleBinding").GroupKind(), o.Name, field.ErrorList{
+						field.Invalid(field.NewPath("roleRef"), o.RoleRef, "cannot be updated"),
+					})
+				}
+			}
+			return c.Update(ctx, obj, opts...)
+		},
+	}
+}

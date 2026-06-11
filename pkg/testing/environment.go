@@ -78,9 +78,9 @@ type EnvironmentBuilder struct {
 	*ComplexEnvironmentBuilder
 }
 
-// NewEnvironmentBuilder creates a new SimpleEnvironmentBuilder.
-// Use this to construct a SimpleEnvironment, if you need only one reconciler and one cluster.
-// For more complex test scenarios, use NewEnvironmentBuilder() instead.
+// NewEnvironmentBuilder creates a new EnvironmentBuilder.
+// Use this to construct a simple Environment, if you need only one reconciler and one cluster.
+// For more complex test scenarios, use NewComplexEnvironmentBuilder() instead.
 func NewEnvironmentBuilder() *EnvironmentBuilder {
 	res := &EnvironmentBuilder{
 		ComplexEnvironmentBuilder: NewComplexEnvironmentBuilder(),

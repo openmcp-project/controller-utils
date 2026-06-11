@@ -10,11 +10,11 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openmcp-project/controller-utils/pkg/pairs"
@@ -172,6 +172,8 @@ func EnsureClusterRole(ctx context.Context, c client.Client, name string, rules 
 // If it doesn't exist, it is created with the expected labels.
 // If it exists, but does not have the expected labels, a ResourceNotManagedError is returned.
 // The ClusterRoleBinding is returned.
+// If the RoleBinding already exists, but has a different RoleRef, it needs to be deleted and recreated, because the RoleRef is immutable.
+// In this case, a WaitingForRecreationError can be returned, if the deletion is not completed immediately (e.g. due to finalizers). The caller then needs to call this function again.
 func EnsureClusterRoleBinding(ctx context.Context, c client.Client, name, clusterRoleName string, subjects []rbacv1.Subject, expectedLabels ...Label) (*rbacv1.ClusterRoleBinding, error) {
 	crbm := resources.NewClusterRoleBindingMutator(name, subjects, resources.NewClusterRoleRef(clusterRoleName))
 	crbm.MetadataMutator().WithLabels(pairs.PairsToMap(expectedLabels))
@@ -186,6 +188,25 @@ func EnsureClusterRoleBinding(ctx context.Context, c client.Client, name, cluste
 	if found {
 		if err := FailIfNotManaged(crb, expectedLabels...); err != nil {
 			return nil, err
+		}
+
+		// check if RoleRef is changed
+		changed := crb.DeepCopy()
+		if err := crbm.Mutate(changed); err != nil {
+			return nil, fmt.Errorf("error mutating ClusterRoleBinding '%s': %w", crb.Name, err)
+		}
+		if !equality.Semantic.DeepEqual(changed.RoleRef, crb.RoleRef) {
+			// we need to delete and recreate the ClusterRoleBinding, because RoleRef is immutable
+			if err := c.Delete(ctx, crb); err != nil {
+				return nil, fmt.Errorf("error deleting ClusterRoleBinding '%s' for recreation: %w", crb.Name, err)
+			}
+			// check if deletion is completed, if not, return a WaitingForRecreationError
+			if err := c.Get(ctx, client.ObjectKeyFromObject(crb), crb); err == nil {
+				return nil, NewWaitingForRecreationError(crb, changed)
+			} else if !apierrors.IsNotFound(err) {
+				return nil, fmt.Errorf("error checking deletion of ClusterRoleBinding '%s': %w", crb.Name, err)
+			}
+			// if the error is IsNotFound, it means the deletion is completed and we can proceed with recreation
 		}
 	}
 	if err := resources.CreateOrUpdateResource(ctx, c, crbm); err != nil {
@@ -238,6 +259,8 @@ func EnsureRole(ctx context.Context, c client.Client, name, namespace string, ru
 // If it doesn't exist, it is created with the expected labels.
 // If it exists, but does not have the expected labels, a ResourceNotManagedError is returned.
 // The RoleBinding is returned.
+// If the RoleBinding already exists, but has a different RoleRef, it needs to be deleted and recreated, because the RoleRef is immutable.
+// In this case, a WaitingForRecreationError can be returned, if the deletion is not completed immediately (e.g. due to finalizers). The caller then needs to call this function again.
 func EnsureRoleBinding(ctx context.Context, c client.Client, name, namespace, roleName string, subjects []rbacv1.Subject, expectedLabels ...Label) (*rbacv1.RoleBinding, error) {
 	rbm := resources.NewRoleBindingMutator(name, namespace, subjects, resources.NewRoleRef(roleName))
 	rbm.MetadataMutator().WithLabels(pairs.PairsToMap(expectedLabels))
@@ -253,6 +276,25 @@ func EnsureRoleBinding(ctx context.Context, c client.Client, name, namespace, ro
 		if err := FailIfNotManaged(rb, expectedLabels...); err != nil {
 			return nil, err
 		}
+
+		// check if RoleRef is changed
+		changed := rb.DeepCopy()
+		if err := rbm.Mutate(changed); err != nil {
+			return nil, fmt.Errorf("error mutating RoleBinding '%s/%s': %w", rb.Namespace, rb.Name, err)
+		}
+		if !equality.Semantic.DeepEqual(changed.RoleRef, rb.RoleRef) {
+			// we need to delete and recreate the RoleBinding, because RoleRef is immutable
+			if err := c.Delete(ctx, rb); err != nil {
+				return nil, fmt.Errorf("error deleting RoleBinding '%s/%s' for recreation: %w", rb.Namespace, rb.Name, err)
+			}
+			// check if deletion is completed, if not, return a WaitingForRecreationError
+			if err := c.Get(ctx, client.ObjectKeyFromObject(rb), rb); err == nil {
+				return nil, NewWaitingForRecreationError(rb, changed)
+			} else if !apierrors.IsNotFound(err) {
+				return nil, fmt.Errorf("error checking deletion of RoleBinding '%s/%s': %w", rb.Namespace, rb.Name, err)
+			}
+			// if the error is IsNotFound, it means the deletion is completed and we can proceed with recreation
+		}
 	}
 	if err := resources.CreateOrUpdateResource(ctx, c, rbm); err != nil {
 		return nil, fmt.Errorf("error creating/updating RoleBinding '%s/%s': %w", rb.Namespace, rb.Name, err)
@@ -264,7 +306,7 @@ func EnsureRoleBinding(ctx context.Context, c client.Client, name, namespace, ro
 func CreateTokenForServiceAccount(ctx context.Context, c client.Client, sa *corev1.ServiceAccount, desiredDuration *time.Duration) (*ServiceAccountToken, error) {
 	tr := &authenticationv1.TokenRequest{}
 	if desiredDuration != nil {
-		tr.Spec.ExpirationSeconds = ptr.To((int64)(desiredDuration.Seconds()))
+		tr.Spec.ExpirationSeconds = new((int64)(desiredDuration.Seconds()))
 	}
 
 	sat := &ServiceAccountToken{
