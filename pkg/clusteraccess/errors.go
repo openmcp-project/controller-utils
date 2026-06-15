@@ -71,3 +71,59 @@ func IsResourceNotManagedError(err error) bool {
 	}
 	return false
 }
+
+// NewWaitingForRecreationError creates a new WaitingForRecreationError.
+func NewWaitingForRecreationError(oldObj, newObj client.Object) *WaitingForRecreationError {
+	return &WaitingForRecreationError{
+		Old: oldObj,
+		New: newObj,
+	}
+}
+
+type WaitingForRecreationError struct {
+	Old client.Object
+	New client.Object
+}
+
+var _ error = &WaitingForRecreationError{}
+
+func (e *WaitingForRecreationError) Error() string {
+	var kind string
+	var name string
+	var namespace string
+	if e.Old != nil {
+		kind = e.Old.GetObjectKind().GroupVersionKind().Kind
+		name = e.Old.GetName()
+		namespace = e.Old.GetNamespace()
+	}
+	if e.New != nil {
+		if kind == "" {
+			kind = e.New.GetObjectKind().GroupVersionKind().Kind
+		}
+		if name == "" {
+			name = e.New.GetName()
+		}
+		if namespace == "" {
+			namespace = e.New.GetNamespace()
+		}
+	}
+	if kind == "" {
+		kind = "resource"
+	}
+	nsMod := ""
+	if namespace != "" {
+		nsMod = namespace + "/"
+	}
+	return fmt.Sprintf("%s '%s%s' needs to be recreated, but the deletion is not completed yet. Please call this function again later.", kind, nsMod, name)
+}
+
+// IsWaitingForRecreationError returns true if the error is non-nil and of type *WaitingForRecreationError.
+func IsWaitingForRecreationError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if _, ok := err.(*WaitingForRecreationError); ok {
+		return true
+	}
+	return false
+}
