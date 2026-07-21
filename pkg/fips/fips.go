@@ -17,7 +17,7 @@ var fipsEnforced string
 // If yes, it checks if FIPS mode is enabled.
 // If it is not enabled but is expected to be enabled it exits the process.
 func Verify(ctx context.Context) {
-	log, ctx := logging.FromContextOrNew(ctx, nil)
+	log, _ := logging.FromContextOrNew(ctx, nil)
 
 	if fipsEnforced != "true" {
 		return
