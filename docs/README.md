@@ -9,6 +9,7 @@
 - [Controller Utility Functions](libs/controller.md)
 - [Custom Resource Definitions](libs/crds.md)
 - [Error Handling](libs/errors.md)
+- [FIPS](libs/fips.md)
 - [Image Parsing](libs/image.md)
 - [JSON Patch](libs/jsonpatch.md)
 - [Logging](libs/logging.md)
