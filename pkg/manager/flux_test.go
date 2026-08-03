@@ -12,17 +12,14 @@ import (
 	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openmcp-project/opencontrolplane-runtime/pkg/serviceprovider/clusteraccess"
-
-	apiv1alpha1 "github.com/openmcp-project/service-provider-external-secrets/api/v1alpha1"
 )
 
 const (
 	testNamespace       = "test"
-	testCharURL         = "chart-url"
+	testChartURL        = "oci://registry.example.com/charts/my-app"
 	testChartPullSecret = "chart-pull-secret"
 	testKubeconfigKey   = "kubeconfig-key"
 )
@@ -34,37 +31,30 @@ func TestManageFluxResources(t *testing.T) {
 		params ManageFluxResourcesParams
 	}{
 		{
-			name: "APIObject and ProviderConfig values mapping",
+			name: "OCIRepository and HelmRelease are created with the correct values",
 			params: ManageFluxResourcesParams{
-				Cluster:      NewManagedCluster(CreateFakeCluster(t, "platform"), &rest.Config{}, testNamespace, PlatformCluster),
-				MCPNamespace: "external-secrets",
-				Obj: &apiv1alpha1.ExternalSecretsOperator{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test",
-						Namespace: testNamespace,
-					},
-					Spec: apiv1alpha1.ExternalSecretsOperatorSpec{
-						Version: "v2.2.0",
-					},
-				},
-				Interval: time.Hour,
+				Cluster:             NewManagedCluster(CreateFakeCluster(t, "platform"), &rest.Config{}, testNamespace, PlatformCluster),
+				MCPNamespace:        "my-service",
+				ChartPullSecretName: "secret-copy",
+				Interval:            time.Hour,
 				ClusterContext: clusteraccess.ClusterContext{
 					MCPAccessSecretKey: client.ObjectKey{
 						Namespace: testNamespace,
 						Name:      testKubeconfigKey,
 					},
 				},
-				ChartPullSecretName: "secret-copy",
-				RequestedVersion: apiv1alpha1.ExternalSecretsVersion{
-					Version:         "v2.2.0",
-					ChartVersion:    "v2.2.0",
-					ChartURL:        new(testCharURL),
-					ChartPullSecret: testChartPullSecret,
+				RequestedVersion: RequestedVersion{
+					Version:      "v1.0.0",
+					ChartURL:     testChartURL,
+					ChartVersion: "1.0.0",
 					HelmValues: &apiextensionv1.JSON{
 						Raw: []byte(`{"foo":"bar"}`),
 					},
 				},
-			}},
+				OCIRepositoryName: "test-repo",
+				HelmReleaseName:   "test-release",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -75,20 +65,20 @@ func TestManageFluxResources(t *testing.T) {
 			// assert oci repo
 			ociRepo := &sourcev1.OCIRepository{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      OCIRepositoryName,
+					Name:      "test-repo",
 					Namespace: testNamespace,
 				},
 			}
 			require.NoError(t, tt.params.Cluster.GetClient().Get(context.TODO(), client.ObjectKeyFromObject(ociRepo), ociRepo))
-			assert.Equal(t, tt.params.RequestedVersion.ChartURL, ptr.To(ociRepo.Spec.URL))
+			assert.Equal(t, tt.params.RequestedVersion.ChartURL, ociRepo.Spec.URL)
 			assert.Equal(t, tt.params.ChartPullSecretName, ociRepo.Spec.SecretRef.Name)
-			assert.Equal(t, tt.params.Obj.Spec.Version, ociRepo.Spec.Reference.Tag)
+			assert.Equal(t, tt.params.RequestedVersion.ChartVersion, ociRepo.Spec.Reference.Tag)
 			assert.Equal(t, tt.params.Interval, ociRepo.Spec.Interval.Duration)
 
 			// assert helm release
 			helmRelease := &helmv2.HelmRelease{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      HelmReleaseName,
+					Name:      "test-release",
 					Namespace: testNamespace,
 				},
 			}

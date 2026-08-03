@@ -38,7 +38,7 @@ func CreateFakeCluster(t *testing.T, id string, clusterObjects ...client.Object)
 func ExecApply(t *testing.T, clusters []ManagedCluster, expectedManagedObjects int, wantErrors []string) []Result {
 	t.Helper()
 	// invoke apply with manager
-	mgr := NewManager()
+	mgr := NewManager("serviceprovider-test")
 	for _, cluster := range clusters {
 		mgr.AddCluster(cluster)
 	}

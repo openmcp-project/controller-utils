@@ -60,7 +60,9 @@ func (m *managerImpl) AddCluster(mc ManagedCluster) {
 	m.clusters = append(m.clusters, mc)
 }
 
-// Apply invokes reconciliation of all ManagedObjects.
+// Apply reconciles all managed objects in registration order.
+// DependsOn is NOT used for apply ordering; it only affects deletion sequencing.
+// Callers are responsible for registering objects in dependency order.
 func (m *managerImpl) Apply(ctx context.Context) ([]Result, error) {
 	return m.reconcileObjects(ctx, false)
 }

@@ -17,6 +17,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+const serviceProvider = "serviceprovider-test"
+const namespace = "test-namespace"
+
 func Test_orphanCleaner_Cleanup(t *testing.T) {
 	tests := []struct {
 		name            string // description of this test case
@@ -29,14 +32,14 @@ func Test_orphanCleaner_Cleanup(t *testing.T) {
 	}{
 		{
 			name:            "only OCIRepository managed by sp-eso are deleted",
-			targetNamespace: DefaultNamespace,
+			targetNamespace: namespace,
 			cluster: createFakeCluster(createFakeClient([]client.Object{
-				createOCIRepo("managed", DefaultNamespace, true),
-				createOCIRepo("unmanaged", DefaultNamespace, false),
+				createOCIRepo("managed", namespace, true),
+				createOCIRepo("unmanaged", namespace, false),
 			})),
 			cleanerType: createOCIRepoCleanerType(),
 			want: []sourcev1.OCIRepository{
-				*createOCIRepo("unmanaged", DefaultNamespace, false),
+				*createOCIRepo("unmanaged", namespace, false),
 			},
 			wantErr: false,
 		},
@@ -44,13 +47,13 @@ func Test_orphanCleaner_Cleanup(t *testing.T) {
 			name:            "OCIRepository in other namespaces are not deleted",
 			targetNamespace: "openmcp-system",
 			cluster: createFakeCluster(createFakeClient([]client.Object{
-				createOCIRepo("managed", DefaultNamespace, true),
-				createOCIRepo("unmanaged", DefaultNamespace, false),
+				createOCIRepo("managed", namespace, true),
+				createOCIRepo("unmanaged", namespace, false),
 			})),
 			cleanerType: createOCIRepoCleanerType(),
 			want: []sourcev1.OCIRepository{
-				*createOCIRepo("managed", DefaultNamespace, true),
-				*createOCIRepo("unmanaged", DefaultNamespace, false),
+				*createOCIRepo("managed", namespace, true),
+				*createOCIRepo("unmanaged", namespace, false),
 			},
 			wantErr: false,
 		},
@@ -58,19 +61,19 @@ func Test_orphanCleaner_Cleanup(t *testing.T) {
 			name:            "objects to keep are not deleted",
 			targetNamespace: "openmcp-system",
 			cluster: createFakeCluster(createFakeClient([]client.Object{
-				createOCIRepo("managed", DefaultNamespace, true),
-				createOCIRepo("unmanaged", DefaultNamespace, false),
+				createOCIRepo("managed", namespace, true),
+				createOCIRepo("unmanaged", namespace, false),
 			})),
 			cleanerType: createOCIRepoCleanerType(corev1.LocalObjectReference{Name: "managed"}),
 			want: []sourcev1.OCIRepository{
-				*createOCIRepo("managed", DefaultNamespace, true),
-				*createOCIRepo("unmanaged", DefaultNamespace, false),
+				*createOCIRepo("managed", namespace, true),
+				*createOCIRepo("unmanaged", namespace, false),
 			},
 			wantErr: false,
 		},
 		{
 			name:            "error is returned when list fails",
-			targetNamespace: DefaultNamespace,
+			targetNamespace: namespace,
 			cluster:         createFakeCluster(listErrorClient{}),
 			cleanerType:     createOCIRepoCleanerType(),
 			want:            []sourcev1.OCIRepository{},
@@ -78,9 +81,9 @@ func Test_orphanCleaner_Cleanup(t *testing.T) {
 		},
 		{
 			name:            "if a single delete fails, the single result contains an error but overall cleanup succeeds",
-			targetNamespace: DefaultNamespace,
+			targetNamespace: namespace,
 			cluster: createFakeCluster(deleteErrorClient{
-				fakeOCIRepo: *createOCIRepo("managed", DefaultNamespace, true),
+				fakeOCIRepo: *createOCIRepo("managed", namespace, true),
 			}),
 			cleanerType:   createOCIRepoCleanerType(),
 			want:          []sourcev1.OCIRepository{},
@@ -90,7 +93,7 @@ func Test_orphanCleaner_Cleanup(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewOrphanCleaner(tt.cluster, tt.targetNamespace, tt.cleanerType)
+			c := NewOrphanCleaner(tt.cluster, serviceProvider, tt.targetNamespace, tt.cleanerType)
 			result, gotErr := c.Cleanup(context.Background())
 			if gotErr != nil {
 				if !tt.wantErr {
@@ -131,47 +134,47 @@ func Test_orphanCleaner_Cleanup_prepareDeletion(t *testing.T) {
 	}{
 		{
 			name:            "preparation succeeds and proceeds with deletion",
-			targetNamespace: DefaultNamespace,
+			targetNamespace: namespace,
 			cluster: createFakeCluster(createFakeClient([]client.Object{
-				createOCIRepo("managed", DefaultNamespace, true),
-				createOCIRepo("unmanaged", DefaultNamespace, false),
+				createOCIRepo("managed", namespace, true),
+				createOCIRepo("unmanaged", namespace, false),
 			})),
 			cleanerType: createOCIRepoCleanerType(),
 			option:      succeedAndDelete,
 			want: []sourcev1.OCIRepository{
-				*createOCIRepo("unmanaged", DefaultNamespace, false),
+				*createOCIRepo("unmanaged", namespace, false),
 			},
 			wantErr:       false,
 			wantResultErr: false,
 		},
 		{
 			name:            "if preparation succeeds but deletion is blocked, no repo is removed",
-			targetNamespace: DefaultNamespace,
+			targetNamespace: namespace,
 			cluster: createFakeCluster(createFakeClient([]client.Object{
-				createOCIRepo("managed", DefaultNamespace, true),
-				createOCIRepo("unmanaged", DefaultNamespace, false),
+				createOCIRepo("managed", namespace, true),
+				createOCIRepo("unmanaged", namespace, false),
 			})),
 			cleanerType: createOCIRepoCleanerType(),
 			option:      succeedAndWait,
 			want: []sourcev1.OCIRepository{
-				*createOCIRepo("managed", DefaultNamespace, true),
-				*createOCIRepo("unmanaged", DefaultNamespace, false),
+				*createOCIRepo("managed", namespace, true),
+				*createOCIRepo("unmanaged", namespace, false),
 			},
 			wantErr:       false,
 			wantResultErr: false,
 		},
 		{
 			name:            "if preparation fails, the single result contains an error but overall cleanup succeeds",
-			targetNamespace: DefaultNamespace,
+			targetNamespace: namespace,
 			cluster: createFakeCluster(createFakeClient([]client.Object{
-				createOCIRepo("managed", DefaultNamespace, true),
-				createOCIRepo("unmanaged", DefaultNamespace, false),
+				createOCIRepo("managed", namespace, true),
+				createOCIRepo("unmanaged", namespace, false),
 			})),
 			cleanerType: createOCIRepoCleanerType(),
 			option:      failWithError,
 			want: []sourcev1.OCIRepository{
-				*createOCIRepo("managed", DefaultNamespace, true),
-				*createOCIRepo("unmanaged", DefaultNamespace, false),
+				*createOCIRepo("managed", namespace, true),
+				*createOCIRepo("unmanaged", namespace, false),
 			},
 			wantErr:       false,
 			wantResultErr: true,
@@ -189,7 +192,7 @@ func Test_orphanCleaner_Cleanup_prepareDeletion(t *testing.T) {
 			case failWithError:
 				cleanerType = tt.cleanerType.withPreSteps(prepDeletionMock.failure)
 			}
-			c := NewOrphanCleaner(tt.cluster, tt.targetNamespace, cleanerType)
+			c := NewOrphanCleaner(tt.cluster, serviceProvider, tt.targetNamespace, cleanerType)
 			result, gotErr := c.Cleanup(context.Background())
 			if gotErr != nil {
 				if !tt.wantErr {
@@ -277,7 +280,7 @@ func createOCIRepo(name, namespace string, managedByEso bool) *sourcev1.OCIRepos
 	}
 	if managedByEso {
 		cm.Labels = map[string]string{
-			LabelManagedBy: LabelManagedByValue,
+			LabelManagedBy: serviceProvider,
 		}
 	}
 	return cm

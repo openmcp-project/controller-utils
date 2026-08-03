@@ -11,6 +11,7 @@ import (
 // DeletionPolicy distinguishes between normal deletion and orphaning an object.
 type DeletionPolicy string
 type InstancePhase string
+type ResourceLocation = ClusterType
 
 const (
 	// Orphan indicates that an object will be orphaned when deletion is requested
@@ -57,7 +58,7 @@ func SimpleStatus(o client.Object, resourceLocation ClusterType) Status {
 type Status struct {
 	Phase    InstancePhase
 	Message  string
-	Location ClusterType
+	Location ResourceLocation
 }
 
 // NewManagedObject creates a new ManagedObject instances to manage the given client.Object.

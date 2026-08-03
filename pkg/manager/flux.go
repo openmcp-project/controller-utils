@@ -7,47 +7,51 @@ import (
 
 	helmv2 "github.com/fluxcd/helm-controller/api/v2"
 	"github.com/fluxcd/pkg/apis/meta"
+	"github.com/fluxcd/pkg/runtime/conditions"
 	sourcev1 "github.com/fluxcd/source-controller/api/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/fluxcd/pkg/runtime/conditions"
-
 	"github.com/openmcp-project/opencontrolplane-runtime/pkg/serviceprovider/clusteraccess"
 	commonapi "github.com/openmcp-project/openmcp-operator/api/common"
 )
 
-// ManageFluxResourcesParams groups all parameters to create the required manage flux resources
+// ManageFluxResourcesParams groups all parameters to create the required Flux resources.
 type ManageFluxResourcesParams struct {
-	// Cluster defines where the resources will be created
+	// Cluster defines where the resources will be created.
 	Cluster ManagedCluster
-	// MCPNamespace defines the namespace name that deploy ESO
+	// MCPNamespace is the target namespace for the Helm release.
 	MCPNamespace string
-	// ChartPullSecretName defines the name of the secret copy that will be placed in the Cluster namespace
+	// ChartPullSecretName is the name of the image-pull secret placed in the cluster namespace.
 	ChartPullSecretName string
-	// Obj is the tenant API object that is being reconciled
-	Obj *client.Object
-	// Interval defines OCIRepository and HelmRelease reconcile intervals
+	// Interval defines the OCIRepository and HelmRelease reconcile intervals.
 	Interval time.Duration
 	// ClusterContext of the current reconciliation context
 	ClusterContext clusteraccess.ClusterContext
 	// RequestedVersion is the version of External Secrets Operator that a user requested through the onboarding API
 	RequestedVersion RequestedVersion
-	// OCIRepositoryName is the name of the OCIRepository resource
+	// OCIRepositoryName is the name of the OCIRepository resource.
 	OCIRepositoryName string
-	// HelmReleaseName is the name of the External Secrets Operator HelmRelease resource
+	// HelmReleaseName is the name of the HelmRelease resource.
 	HelmReleaseName string
 }
 
+// RequestedVersion describes the chart artifact that should be installed.
 type RequestedVersion struct {
+	// Version is a human-readable version identifier (e.g. "v1.2.0").
 	Version string
-	ChartURL    string
+	// ChartURL is the OCI URL of the Helm chart repository.
+	ChartURL string
+	// ChartVersion is the tag used to select the chart from the OCI repository.
 	ChartVersion string
-	HelmValues   *apiextensionsv1.JSON
+	// HelmValues are the values to pass to the Helm release.
+	HelmValues *apiextensionsv1.JSON
 }
 
-// ManageFluxResources configures OCIRepo and HelmRelease
+// ManageFluxResources registers an OCIRepository and a HelmRelease as managed objects on the
+// cluster defined in p.Cluster. The objects are not reconciled until the caller invokes
+// Manager.Apply.
 func ManageFluxResources(p ManageFluxResourcesParams) {
 	ociRepo := NewManagedObject(&sourcev1.OCIRepository{
 		ObjectMeta: metav1.ObjectMeta{
@@ -62,7 +66,7 @@ func ManageFluxResources(p ManageFluxResourcesParams) {
 			}
 			if p.RequestedVersion.ChartURL == "" {
 				// this should never happen as long as defaulting works properly
-				return fmt.Errorf("missing ChartURL definition for Flux version %s", p.RequestedVersion.Version)
+				return fmt.Errorf("missing ChartURL definition for version %s", p.RequestedVersion.Version)
 			}
 			ociRepo.Spec = sourcev1.OCIRepositorySpec{
 				Interval: metav1.Duration{Duration: p.Interval},
@@ -71,8 +75,7 @@ func ManageFluxResources(p ManageFluxResourcesParams) {
 					Tag: p.RequestedVersion.ChartVersion,
 				},
 				// required to always select the correct OCI layer
-				// this mitigates non-deterministic layer ordering across different eso versions
-				// that prevented the OCIRepository from getting ready for some eso versions
+				// this mitigates non-deterministic layer ordering across chart versions
 				// https://fluxcd.io/flux/components/source/ocirepositories/#layer-selector
 				LayerSelector: &sourcev1.OCILayerSelector{
 					MediaType: "application/vnd.cncf.helm.chart.content.v1.tar+gzip",
@@ -138,7 +141,7 @@ func ManageFluxResources(p ManageFluxResourcesParams) {
 	p.Cluster.AddObject(helmRelease)
 }
 
-// FluxStatus indicates whether the given object is in phase terminating, pending or ready.
+// FluxStatus returns the Status of a Flux-managed object by inspecting its Ready condition.
 func FluxStatus(o client.Object, resourceLocation ClusterType) Status {
 	fluxObject := o.(conditions.Getter)
 	if !o.GetDeletionTimestamp().IsZero() {
