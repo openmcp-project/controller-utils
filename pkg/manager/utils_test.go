@@ -1,4 +1,4 @@
-package externalsecrets
+package manager
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	helmv2 "github.com/fluxcd/helm-controller/api/v2"
 	sourcev1 "github.com/fluxcd/source-controller/api/v1"
 	"github.com/openmcp-project/controller-utils/pkg/clusters"
+	"github.com/openmcp-project/opencontrolplane-runtime/testdata/api/v1alpha1"
 	clustersv1alpha1 "github.com/openmcp-project/openmcp-operator/api/clusters/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,8 +16,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	"github.com/openmcp-project/service-provider-external-secrets/api/v1alpha1"
 )
 
 // CreateFakeCluster sets up a cluster with a fake client

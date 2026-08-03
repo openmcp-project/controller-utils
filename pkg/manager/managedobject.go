@@ -1,11 +1,11 @@
-package externalsecrets
+package manager
 
 import (
 	"context"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	commonapi "github.com/openmcp-project/openmcp-operator/api/common"
 
-	"github.com/openmcp-project/service-provider-external-secrets/api/v1alpha1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // DeletionPolicy distinguishes between normal deletion and orphaning an object.
@@ -27,36 +27,36 @@ func NoOp(context.Context, client.Object) error {
 }
 
 // StatusFunc provides Status information for the given client.Object.
-type StatusFunc func(o client.Object, rl v1alpha1.ResourceLocation) Status
+type StatusFunc func(o client.Object, resourceLocation string) Status
 
 // SimpleStatus indicates whether the given object is in phase terminating, pending or ready.
-func SimpleStatus(o client.Object, rl v1alpha1.ResourceLocation) Status {
+func SimpleStatus(o client.Object, resourceLocation string) Status {
 	if !o.GetDeletionTimestamp().IsZero() {
 		return Status{
-			Phase:    v1alpha1.Terminating,
+			Phase:    commonapi.StatusPhaseTerminating,
 			Message:  "Resource is terminating.",
-			Location: rl,
+			Location: resourceLocation,
 		}
 	}
 	if o.GetUID() == "" {
 		return Status{
-			Phase:    v1alpha1.Pending,
+			Phase:    commonapi.StatusPhaseProgressing,
 			Message:  "Resource has not been created yet.",
-			Location: rl,
+			Location: resourceLocation,
 		}
 	}
 	return Status{
-		Phase:    v1alpha1.Ready,
+		Phase:    commonapi.StatusPhaseReady,
 		Message:  "Resource exists.",
-		Location: rl,
+		Location: resourceLocation,
 	}
 }
 
 // Status defines the status attributes of a ManagedObject.
 type Status struct {
-	Phase    v1alpha1.InstancePhase
+	Phase    string
 	Message  string
-	Location v1alpha1.ResourceLocation
+	Location string
 }
 
 // NewManagedObject creates a new ManagedObject instances to manage the given client.Object.
@@ -71,6 +71,7 @@ func NewManagedObject(o client.Object, moc ManagedObjectContext) ManagedObject {
 		dependencies:   moc.DependsOn,
 		deletionPolicy: moc.DeletionPolicy,
 		statusFunc:     moc.StatusFunc,
+		managedBy:      moc.ManagedBy,
 	}
 }
 
@@ -80,15 +81,17 @@ type ManagedObjectContext struct {
 	DependsOn      []ManagedObject
 	DeletionPolicy DeletionPolicy
 	StatusFunc     StatusFunc
+	ManagedBy       string
 }
 
-// ManagedObject represents an object managed by a Manager.
+// ManagedObject represents an object managed by a Mana^ger.
 type ManagedObject interface {
 	GetObject() client.Object
 	Reconcile(ctx context.Context) error
 	GetDependencies() []ManagedObject
 	GetDeletionPolicy() DeletionPolicy
-	GetStatus(v1alpha1.ResourceLocation) Status
+	GetStatus(resourceLocation string) Status
+	Label() string
 }
 
 var _ ManagedObject = &managedObject{}
@@ -99,17 +102,18 @@ type managedObject struct {
 	statusFunc     StatusFunc
 	dependencies   []ManagedObject
 	deletionPolicy DeletionPolicy
+	managedBy      string
 }
 
 // GetStatus implements ManagedObject.
-func (m *managedObject) GetStatus(rl v1alpha1.ResourceLocation) Status {
+func (m *managedObject) GetStatus(resourceLocation string) Status {
 	if m.statusFunc != nil {
-		return m.statusFunc(m.object, rl)
+		return m.statusFunc(m.object, resourceLocation)
 	}
 	return Status{
-		Phase:    v1alpha1.Unknown,
+		Phase:    "Unknown",
 		Message:  "No status function defined.",
-		Location: rl,
+		Location: resourceLocation,
 	}
 }
 
@@ -134,4 +138,9 @@ func (m *managedObject) Reconcile(ctx context.Context) error {
 // GetObject implements ManagedObject.
 func (m *managedObject) GetObject() client.Object {
 	return m.object
+}
+
+// Label implements ManagedObject.
+func (m *managedObject) Label() string {
+	return m.managedBy
 }

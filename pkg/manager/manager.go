@@ -1,4 +1,4 @@
-package externalsecrets
+package manager
 
 import (
 	"context"
@@ -40,15 +40,17 @@ type OrphanCleaner interface {
 }
 
 // NewManager creates a new Manager instance.
-func NewManager() Manager {
+func NewManager(serviceProvider string) Manager {
 	return &managerImpl{
-		clusters: []ManagedCluster{},
-		cleaners: []OrphanCleaner{},
+		serviceProvider: serviceProvider,
+		clusters:       []ManagedCluster{},
+		cleaners:       []OrphanCleaner{},
 	}
 }
 
 // managerImpl manages clusters and invokes reconciliation of ManagedObjects.
 type managerImpl struct {
+	serviceProvider string
 	clusters []ManagedCluster
 	cleaners []OrphanCleaner
 }
@@ -138,7 +140,7 @@ func (m *managerImpl) reconcileObject(ctx context.Context, mc ManagedCluster, mo
 	}
 
 	opResult, err := controllerutil.CreateOrUpdate(ctx, client, obj, func() error {
-		SetManagedBy(obj)
+		SetManagedBy(obj , m.serviceProvider)
 		return mo.Reconcile(ctx)
 	})
 	return Result{

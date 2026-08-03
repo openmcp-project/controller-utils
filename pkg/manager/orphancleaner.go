@@ -1,4 +1,4 @@
-package externalsecrets
+package manager
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	apiv1alpha1 "github.com/openmcp-project/service-provider-external-secrets/api/v1alpha1"
+	commonapi "github.com/openmcp-project/openmcp-operator/api/common"
 )
 
 // ErrOrphanCleanup is an user-facing error that indicates orphan cleanup failures
@@ -20,9 +20,10 @@ var ErrOrphanCleanup = errors.New("orphan cleanup failed")
 var _ OrphanCleaner = &orphanCleaner[*corev1.SecretList]{}
 
 type orphanCleaner[T client.ObjectList] struct {
-	cluster     ManagedCluster
-	namespace   string
-	cleanerType cleanerType[T]
+	cluster         ManagedCluster
+	serviceProvider string
+	namespace       string
+	cleanerType     cleanerType[T]
 }
 
 type cleanerType[T client.ObjectList] struct {
@@ -37,11 +38,12 @@ type cleanerType[T client.ObjectList] struct {
 }
 
 // NewOrphanCleaner removes redundant objects in the given target namespace.
-func NewOrphanCleaner[T client.ObjectList](cluster ManagedCluster, namespace string, clType cleanerType[T]) OrphanCleaner {
+func NewOrphanCleaner[T client.ObjectList](cluster ManagedCluster, serviceProvider string, namespace string, clType cleanerType[T]) OrphanCleaner {
 	return &orphanCleaner[T]{
-		cluster:     cluster,
-		namespace:   namespace,
-		cleanerType: clType,
+		cluster:         cluster,
+		serviceProvider: serviceProvider,
+		namespace:       namespace,
+		cleanerType:     clType,
 	}
 }
 
@@ -65,7 +67,7 @@ func (c *orphanCleaner[T]) Cleanup(ctx context.Context) ([]Result, error) {
 	cl := c.cluster.GetClient()
 	if err := cl.List(ctx, objList,
 		client.InNamespace(c.namespace),
-		client.MatchingLabels{LabelManagedBy: LabelManagedByValue},
+		client.MatchingLabels{LabelManagedBy: c.serviceProvider},
 	); err != nil {
 		log.FromContext(ctx).Error(err, "failed to list objects for orphan cleanup")
 		return nil, ErrOrphanCleanup
@@ -105,11 +107,11 @@ func (c *orphanCleaner[T]) deletionPrepared(obj client.Object) Result {
 	}
 }
 
-func cleanupPreparedStatus(_ client.Object, rl apiv1alpha1.ResourceLocation) Status {
+func cleanupPreparedStatus(_ client.Object, resourceLocation string) Status {
 	return Status{
-		Phase:    apiv1alpha1.Terminating,
+		Phase:    commonapi.StatusPhaseTerminating,
 		Message:  "Orphan cleanup prepared",
-		Location: rl,
+		Location: resourceLocation,
 	}
 }
 
@@ -126,10 +128,10 @@ func (c *orphanCleaner[T]) deletionError(obj client.Object, err error) Result {
 	}
 }
 
-func cleanupErrorStatus(_ client.Object, rl apiv1alpha1.ResourceLocation) Status {
+func cleanupErrorStatus(_ client.Object, resourceLocation string) Status {
 	return Status{
-		Phase:    apiv1alpha1.Terminating,
+		Phase:    "Failed",
 		Message:  "Orphan cleanup failed",
-		Location: rl,
+		Location: resourceLocation,
 	}
 }

@@ -1,4 +1,4 @@
-package externalsecrets
+package manager
 
 import (
 	"testing"

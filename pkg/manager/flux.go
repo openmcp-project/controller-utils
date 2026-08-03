@@ -1,4 +1,4 @@
-package externalsecrets
+package manager
 
 import (
 	"context"
@@ -8,14 +8,14 @@ import (
 	helmv2 "github.com/fluxcd/helm-controller/api/v2"
 	"github.com/fluxcd/pkg/apis/meta"
 	sourcev1 "github.com/fluxcd/source-controller/api/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/fluxcd/pkg/runtime/conditions"
 
 	"github.com/openmcp-project/opencontrolplane-runtime/pkg/serviceprovider/clusteraccess"
-
-	apiv1alpha1 "github.com/openmcp-project/service-provider-external-secrets/api/v1alpha1"
+	commonapi "github.com/openmcp-project/openmcp-operator/api/common"
 )
 
 const (
@@ -36,13 +36,20 @@ type ManageFluxResourcesParams struct {
 	// ChartPullSecretName defines the name of the secret copy that will be placed in the Cluster namespace
 	ChartPullSecretName string
 	// Obj is the tenant API object that is being reconciled
-	Obj *apiv1alpha1.ExternalSecretsOperator
+	Obj *client.Object
 	// Interval defines OCIRepository and HelmRelease reconcile intervals
 	Interval time.Duration
 	// ClusterContext of the current reconciliation context
 	ClusterContext clusteraccess.ClusterContext
 	// RequestedVersion is the version of External Secrets Operator that a user requested through the onboarding API
-	RequestedVersion apiv1alpha1.ExternalSecretsVersion
+	RequestedVersion RequestedVersion
+}
+
+type RequestedVersion struct {
+	Version string
+	ChartURL    string
+	ChartVersion string
+	HelmValues   *apiextensionsv1.JSON
 }
 
 // ManageFluxResources configures OCIRepo and HelmRelease
@@ -58,13 +65,13 @@ func ManageFluxResources(p ManageFluxResourcesParams) {
 			if !ok {
 				return fmt.Errorf("expected *sourcev1.OCIRepository, got %T", o)
 			}
-			if p.RequestedVersion.ChartURL == nil {
+			if p.RequestedVersion.ChartURL == "" {
 				// this should never happen as long as defaulting works properly
 				return fmt.Errorf("missing ChartURL definition for Flux version %s", p.RequestedVersion.Version)
 			}
 			ociRepo.Spec = sourcev1.OCIRepositorySpec{
 				Interval: metav1.Duration{Duration: p.Interval},
-				URL:      *p.RequestedVersion.ChartURL,
+				URL:      p.RequestedVersion.ChartURL,
 				Reference: &sourcev1.OCIRepositoryRef{
 					Tag: p.RequestedVersion.ChartVersion,
 				},
@@ -137,25 +144,25 @@ func ManageFluxResources(p ManageFluxResourcesParams) {
 }
 
 // FluxStatus indicates whether the given object is in phase terminating, pending or ready.
-func FluxStatus(o client.Object, rl apiv1alpha1.ResourceLocation) Status {
+func FluxStatus(o client.Object, resourceLocation string) Status {
 	fluxObject := o.(conditions.Getter)
 	if !o.GetDeletionTimestamp().IsZero() {
 		return Status{
-			Phase:    apiv1alpha1.Terminating,
+			Phase:    commonapi.StatusPhaseTerminating,
 			Message:  "Resource is terminating.",
-			Location: rl,
+			Location: resourceLocation,
 		}
 	}
-	if conditions.IsTrue(fluxObject, meta.ReadyCondition) {
+	if conditions.IsReady(fluxObject) {
 		return Status{
-			Phase:    apiv1alpha1.Ready,
+			Phase:    commonapi.StatusPhaseReady,
 			Message:  "Resource is ready",
-			Location: rl,
+			Location: resourceLocation,
 		}
 	}
 	return Status{
-		Phase:    apiv1alpha1.Pending,
+		Phase:    commonapi.StatusPhaseProgressing,
 		Message:  "Resource is not ready",
-		Location: rl,
+		Location: resourceLocation,
 	}
 }
