@@ -57,7 +57,7 @@ func TestManagePullSecrets(t *testing.T) {
 				SourceClient:    fakeCluster.Client(),
 				SourceNamespace: sourceNamespace,
 				TargetNamespace: targetNamespace,
-				TargetName:      fmt.Sprintf("%s%s", secretNamePrefix, secretName),
+				TargetName:      fmt.Sprintf("%s%s", "secretNamePrefix", secretName),
 			},
 		},
 	}
@@ -103,9 +103,9 @@ func TestPrefixSecretName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := PrefixSecretName(tt.input)
+			got, err := PrefixSecretName(tt.input, "secretNamePrefix")
 			require.NoError(t, err)
-			assert.True(t, strings.HasPrefix(got, secretNamePrefix))
+			assert.True(t, strings.HasPrefix(got, "secretNamePrefix"))
 			assert.LessOrEqual(t, len(got), 63)
 		})
 	}
