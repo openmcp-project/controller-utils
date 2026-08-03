@@ -1,4 +1,4 @@
-package externalsecrets
+package manager
 
 import (
 	"context"
@@ -21,9 +21,9 @@ type SecretCopyConfig struct {
 	TargetNamespace string
 	// TargetName is the name of the target secret.
 	TargetName string
+	// ServiceProviderPrefix is the prefix for the secret in the tenant namespace
+	ServiceProviderPrefix string
 }
-
-const secretNamePrefix = "sp-eso-"
 
 // ManagePullSecret syncs every image pull secret the to cluster
 func ManagePullSecret(targetCluster ManagedCluster, pullSecret corev1.LocalObjectReference, config SecretCopyConfig) {
@@ -60,14 +60,14 @@ func ManagePullSecret(targetCluster ManagedCluster, pullSecret corev1.LocalObjec
 // to prevent name collisions in namespaces where multiple service providers operate.
 // If the resulting name exceeds 63 characters (K8s limit), it will be truncated
 // and a hash suffix appended for uniqueness via ShortenToXCharacters.
-func PrefixSecretName(secretName string) (string, error) {
-	return ctrlutils.ShortenToXCharacters(fmt.Sprintf("%s%s", secretNamePrefix, secretName), ctrlutils.K8sMaxNameLength)
+func PrefixSecretName(secretName string, config SecretCopyConfig) (string, error) {
+	return ctrlutils.ShortenToXCharacters(fmt.Sprintf("%s%s", config.ServiceProviderPrefix, secretName), ctrlutils.K8sMaxNameLength)
 }
 
 // NewSecretCleaner removes redundant pull secrets in the given target namespace
 // by removing any secret labeled as managed by sp-external-secrets that is not in secretsToKeep.
-func NewSecretCleaner(cluster ManagedCluster, namespace string, secretsToKeep []corev1.LocalObjectReference) OrphanCleaner {
-	return NewOrphanCleaner(cluster, namespace, cleanerType[*corev1.SecretList]{
+func NewSecretCleaner(cluster ManagedCluster, serviceProvider string, namespace string, secretsToKeep []corev1.LocalObjectReference) OrphanCleaner {
+	return NewOrphanCleaner(cluster, serviceProvider, namespace, cleanerType[*corev1.SecretList]{
 		EmptyList: func() *corev1.SecretList {
 			return &corev1.SecretList{}
 		},
