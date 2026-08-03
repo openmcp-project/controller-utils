@@ -18,15 +18,6 @@ import (
 	commonapi "github.com/openmcp-project/openmcp-operator/api/common"
 )
 
-const (
-	// DefaultNamespace is the default namespace where External Secrets Operator components are deployed on the ManagedControlPlane
-	DefaultNamespace = "external-secrets"
-	// OCIRepositoryName is the name of the External Secrets Operator OCIRepository resource
-	OCIRepositoryName = "external-secrets"
-	// HelmReleaseName is the name of the External Secrets Operator HelmRelease resource
-	HelmReleaseName = "external-secrets"
-)
-
 // ManageFluxResourcesParams groups all parameters to create the required manage flux resources
 type ManageFluxResourcesParams struct {
 	// Cluster defines where the resources will be created
@@ -43,6 +34,10 @@ type ManageFluxResourcesParams struct {
 	ClusterContext clusteraccess.ClusterContext
 	// RequestedVersion is the version of External Secrets Operator that a user requested through the onboarding API
 	RequestedVersion RequestedVersion
+	// OCIRepositoryName is the name of the OCIRepository resource
+	OCIRepositoryName string
+	// HelmReleaseName is the name of the External Secrets Operator HelmRelease resource
+	HelmReleaseName string
 }
 
 type RequestedVersion struct {
@@ -56,7 +51,7 @@ type RequestedVersion struct {
 func ManageFluxResources(p ManageFluxResourcesParams) {
 	ociRepo := NewManagedObject(&sourcev1.OCIRepository{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      OCIRepositoryName,
+			Name:      p.OCIRepositoryName,
 			Namespace: p.Cluster.GetDefaultNamespace(),
 		},
 	}, ManagedObjectContext{
@@ -99,7 +94,7 @@ func ManageFluxResources(p ManageFluxResourcesParams) {
 
 	helmRelease := NewManagedObject(&helmv2.HelmRelease{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      HelmReleaseName,
+			Name:      p.HelmReleaseName,
 			Namespace: p.Cluster.GetDefaultNamespace(),
 		},
 	}, ManagedObjectContext{
@@ -112,7 +107,7 @@ func ManageFluxResources(p ManageFluxResourcesParams) {
 				Interval: metav1.Duration{Duration: p.Interval},
 				ChartRef: &helmv2.CrossNamespaceSourceReference{
 					Kind:      "OCIRepository",
-					Name:      OCIRepositoryName,
+					Name:      p.OCIRepositoryName,
 					Namespace: p.Cluster.GetDefaultNamespace(),
 				},
 				KubeConfig: &meta.KubeConfigReference{
@@ -144,7 +139,7 @@ func ManageFluxResources(p ManageFluxResourcesParams) {
 }
 
 // FluxStatus indicates whether the given object is in phase terminating, pending or ready.
-func FluxStatus(o client.Object, resourceLocation string) Status {
+func FluxStatus(o client.Object, resourceLocation ClusterType) Status {
 	fluxObject := o.(conditions.Getter)
 	if !o.GetDeletionTimestamp().IsZero() {
 		return Status{

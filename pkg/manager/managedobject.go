@@ -10,6 +10,7 @@ import (
 
 // DeletionPolicy distinguishes between normal deletion and orphaning an object.
 type DeletionPolicy string
+type InstancePhase string
 
 const (
 	// Orphan indicates that an object will be orphaned when deletion is requested
@@ -27,10 +28,10 @@ func NoOp(context.Context, client.Object) error {
 }
 
 // StatusFunc provides Status information for the given client.Object.
-type StatusFunc func(o client.Object, resourceLocation string) Status
+type StatusFunc func(o client.Object, resourceLocation ClusterType) Status
 
 // SimpleStatus indicates whether the given object is in phase terminating, pending or ready.
-func SimpleStatus(o client.Object, resourceLocation string) Status {
+func SimpleStatus(o client.Object, resourceLocation ClusterType) Status {
 	if !o.GetDeletionTimestamp().IsZero() {
 		return Status{
 			Phase:    commonapi.StatusPhaseTerminating,
@@ -54,9 +55,9 @@ func SimpleStatus(o client.Object, resourceLocation string) Status {
 
 // Status defines the status attributes of a ManagedObject.
 type Status struct {
-	Phase    string
+	Phase    InstancePhase
 	Message  string
-	Location string
+	Location ClusterType
 }
 
 // NewManagedObject creates a new ManagedObject instances to manage the given client.Object.
@@ -90,7 +91,7 @@ type ManagedObject interface {
 	Reconcile(ctx context.Context) error
 	GetDependencies() []ManagedObject
 	GetDeletionPolicy() DeletionPolicy
-	GetStatus(resourceLocation string) Status
+	GetStatus(resourceLocation ClusterType) Status
 	Label() string
 }
 
@@ -106,7 +107,7 @@ type managedObject struct {
 }
 
 // GetStatus implements ManagedObject.
-func (m *managedObject) GetStatus(resourceLocation string) Status {
+func (m *managedObject) GetStatus(resourceLocation ClusterType) Status {
 	if m.statusFunc != nil {
 		return m.statusFunc(m.object, resourceLocation)
 	}

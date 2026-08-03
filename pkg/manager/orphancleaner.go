@@ -107,7 +107,7 @@ func (c *orphanCleaner[T]) deletionPrepared(obj client.Object) Result {
 	}
 }
 
-func cleanupPreparedStatus(_ client.Object, resourceLocation string) Status {
+func cleanupPreparedStatus(_ client.Object, resourceLocation ClusterType) Status {
 	return Status{
 		Phase:    commonapi.StatusPhaseTerminating,
 		Message:  "Orphan cleanup prepared",
@@ -128,7 +128,7 @@ func (c *orphanCleaner[T]) deletionError(obj client.Object, err error) Result {
 	}
 }
 
-func cleanupErrorStatus(_ client.Object, resourceLocation string) Status {
+func cleanupErrorStatus(_ client.Object, resourceLocation ClusterType) Status {
 	return Status{
 		Phase:    "Failed",
 		Message:  "Orphan cleanup failed",
