@@ -68,7 +68,7 @@ func (m *managerImpl) AddCluster(mc ManagedCluster) {
 // DependsOn is NOT used for apply ordering; it only affects deletion sequencing.
 // Callers are responsible for registering objects in dependency order.
 func (m *managerImpl) Apply(ctx context.Context) ([]ManagedResource, error) {
-	results, err := m.reconcileObjects(ctx, true)
+	results, err := m.reconcileObjects(ctx, false)
 	if err != nil {
 		return []ManagedResource{}, err
 	}
