@@ -35,30 +35,20 @@ func CreateFakeCluster(t *testing.T, id string, clusterObjects ...client.Object)
 }
 
 // ExecApply sets up a manager for the provided clusters and invokes reconciliation of all managed objects
-func ExecApply(t *testing.T, clusters []ManagedCluster, expectedManagedObjects int, wantErrors []string) []Result {
+func ExecApply(t *testing.T, clusters []ManagedCluster, expectedManagedObjects int, wantErrors []string) []ManagedResource {
 	t.Helper()
 	// invoke apply with manager
 	mgr := NewManager("serviceprovider-test")
 	for _, cluster := range clusters {
 		mgr.AddCluster(cluster)
 	}
-	results, err := mgr.Apply(context.TODO())
+	managedResources, err := mgr.Apply(context.TODO())
 	require.NoError(t, err)
-	return assertResult(t, results, expectedManagedObjects, wantErrors)
+	return assertResult(t, managedResources, expectedManagedObjects, wantErrors)
 }
 
-func assertResult(t *testing.T, results []Result, expectedManagedObjects int, wantErrors []string) []Result {
+func assertResult(t *testing.T, managedResources []ManagedResource, expectedManagedObjects int, wantErrors []string) []ManagedResource {
 	t.Helper()
-	assert.Len(t, results, expectedManagedObjects, "expected %d managed object(s), got %d managed object(s)")
-	errcount := 0
-	for _, r := range results {
-		if r.Error != nil {
-			// assert that an error is expected
-			assert.Contains(t, wantErrors, r.Object.GetObject().GetName(), "unexpected reconcile error of managed object %s", r.Object.GetObject().GetName())
-			errcount++
-		}
-	}
-	// assert that the overall number of errors is expected
-	assert.Equal(t, len(wantErrors), errcount, "expected %d reconcile error(s), got %d reconcile error(s)", len(wantErrors), errcount)
-	return results
+	assert.Len(t, managedResources, expectedManagedObjects, "expected %d managed object(s), got %d managed object(s)")
+	return managedResources
 }

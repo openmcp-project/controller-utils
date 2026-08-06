@@ -10,8 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	commonapi "github.com/openmcp-project/openmcp-operator/api/common"
 )
 
 // ErrOrphanCleanup is an user-facing error that indicates orphan cleanup failures
@@ -96,42 +94,28 @@ func (c *orphanCleaner[T]) Cleanup(ctx context.Context) ([]Result, error) {
 }
 
 func (c *orphanCleaner[T]) deletionPrepared(obj client.Object) Result {
+	mo := &managedObject{
+		object:         obj,
+		deletionPolicy: Delete,
+	}
+
 	return Result{
-		Object: &managedObject{
-			object:         obj,
-			statusFunc:     cleanupPreparedStatus,
-			deletionPolicy: Delete,
-		},
+		Object:          mo,
 		Cluster:         c.cluster,
 		OperationResult: OperationResultDeletionRequested,
 	}
 }
 
-func cleanupPreparedStatus(_ client.Object, resourceLocation ClusterType) Status {
-	return Status{
-		Phase:    commonapi.StatusPhaseTerminating,
-		Message:  "Orphan cleanup prepared",
-		Location: resourceLocation,
-	}
-}
-
 func (c *orphanCleaner[T]) deletionError(obj client.Object, err error) Result {
+	mo := &managedObject{
+		object:         obj,
+		deletionPolicy: Delete,
+	}
+	
 	return Result{
-		Object: &managedObject{
-			object:         obj,
-			statusFunc:     cleanupErrorStatus,
-			deletionPolicy: Delete,
-		},
+		Object:          mo,
 		Cluster:         c.cluster,
 		OperationResult: OperationResultDeletionFailed,
 		Error:           err,
-	}
-}
-
-func cleanupErrorStatus(_ client.Object, resourceLocation ClusterType) Status {
-	return Status{
-		Phase:    "Failed",
-		Message:  "Orphan cleanup failed",
-		Location: resourceLocation,
 	}
 }

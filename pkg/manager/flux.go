@@ -14,7 +14,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openmcp-project/opencontrolplane-runtime/pkg/serviceprovider/clusteraccess"
-	commonapi "github.com/openmcp-project/openmcp-operator/api/common"
 )
 
 // ManageFluxResourcesParams groups all parameters to create the required Flux resources.
@@ -37,15 +36,11 @@ type ManageFluxResourcesParams struct {
 	HelmReleaseName string
 }
 
-// RequestedVersion describes the chart artifact that should be installed.
 type RequestedVersion struct {
-	// Version is a human-readable version identifier (e.g. "v1.2.0").
 	Version string
-	// ChartURL is the OCI URL of the Helm chart repository.
-	ChartURL string
-	// ChartVersion is the tag used to select the chart from the OCI repository.
 	ChartVersion string
-	// HelmValues are the values to pass to the Helm release.
+	ChartURL string
+	ChartPullSecret string
 	HelmValues *apiextensionsv1.JSON
 }
 
@@ -53,6 +48,16 @@ type RequestedVersion struct {
 // cluster defined in p.Cluster. The objects are not reconciled until the caller invokes
 // Manager.Apply.
 func ManageFluxResources(p ManageFluxResourcesParams) {
+	ociDependants := []ManagedObject{}
+	ociRepo := manageOCIRepo(p, ociDependants)
+	p.Cluster.AddObject(ociRepo)
+
+	helmDependants := []ManagedObject{ociRepo}
+	helmRelease := manageHelmRelease(p, helmDependants)
+	p.Cluster.AddObject(helmRelease)
+}
+
+func manageOCIRepo(p ManageFluxResourcesParams, dependants []ManagedObject) ManagedObject {
 	ociRepo := NewManagedObject(&sourcev1.OCIRepository{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      p.OCIRepositoryName,
@@ -89,12 +94,14 @@ func ManageFluxResources(p ManageFluxResourcesParams) {
 			}
 			return nil
 		},
-		DependsOn:      []ManagedObject{},
+		DependsOn:      dependants,
 		DeletionPolicy: Delete,
 		StatusFunc:     FluxStatus,
 	})
-	p.Cluster.AddObject(ociRepo)
+	return ociRepo
+}
 
+func manageHelmRelease(p ManageFluxResourcesParams, dependants []ManagedObject) ManagedObject {
 	helmRelease := NewManagedObject(&helmv2.HelmRelease{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      p.HelmReleaseName,
@@ -134,33 +141,30 @@ func ManageFluxResources(p ManageFluxResourcesParams) {
 			}
 			return nil
 		},
-		DependsOn:      []ManagedObject{ociRepo},
+		DependsOn:      dependants,
 		DeletionPolicy: Delete,
 		StatusFunc:     FluxStatus,
 	})
-	p.Cluster.AddObject(helmRelease)
+	return helmRelease
 }
 
-// FluxStatus returns the Status of a Flux-managed object by inspecting its Ready condition.
-func FluxStatus(o client.Object, resourceLocation ClusterType) Status {
+// FluxStatus indicates whether the given object is in phase terminating, pending or ready.
+func FluxStatus(o client.Object) Status {
 	fluxObject := o.(conditions.Getter)
 	if !o.GetDeletionTimestamp().IsZero() {
 		return Status{
-			Phase:    commonapi.StatusPhaseTerminating,
+			Phase:    StatusPhaseTerminating,
 			Message:  "Resource is terminating.",
-			Location: resourceLocation,
 		}
 	}
-	if conditions.IsReady(fluxObject) {
+	if conditions.IsTrue(fluxObject, meta.ReadyCondition) {
 		return Status{
-			Phase:    commonapi.StatusPhaseReady,
+			Phase:    StatusPhaseReady,
 			Message:  "Resource is ready",
-			Location: resourceLocation,
 		}
 	}
 	return Status{
-		Phase:    commonapi.StatusPhaseProgressing,
+		Phase:    StatusPhaseProgressing,
 		Message:  "Resource is not ready",
-		Location: resourceLocation,
 	}
 }
