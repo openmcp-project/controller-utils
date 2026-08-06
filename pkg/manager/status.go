@@ -17,8 +17,11 @@ const (
 
 // Status defines the status attributes of a ManagedObject.
 type Status struct {
-	Phase    string
-	Message  string
+	// +required
+	Phase    string `json:"phase,omitempty"`
+
+	// +required
+	Message  string `json:"message,omitempty"`
 }
 
 // SimpleStatus indicates whether the given object is in phase terminating, pending or ready.

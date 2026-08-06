@@ -26,7 +26,7 @@ type ManagedResource struct {
 	// Message string `json:"message,omitempty"`
 
 	// +required
-	Status Status
+	Status Status `json:"status,omitempty"`
 	
 	// +optional
 	Location ClusterType `json:"location,omitempty"`

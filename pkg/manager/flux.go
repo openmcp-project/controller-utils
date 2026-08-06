@@ -28,7 +28,7 @@ type ManageFluxResourcesParams struct {
 	Interval time.Duration
 	// ClusterContext of the current reconciliation context
 	ClusterContext clusteraccess.ClusterContext
-	// RequestedVersion is the version of External Secrets Operator that a user requested through the onboarding API
+	// RequestedVersion is the version of Service Operator that a user requested through the onboarding API
 	RequestedVersion RequestedVersion
 	// OCIRepositoryName is the name of the OCIRepository resource.
 	OCIRepositoryName string
@@ -36,12 +36,31 @@ type ManageFluxResourcesParams struct {
 	HelmReleaseName string
 }
 
+// RequestedVersion defines a version of Service Operator that can be installed
 type RequestedVersion struct {
-	Version string
-	ChartVersion string
-	ChartURL string
-	ChartPullSecret string
-	HelmValues *apiextensionsv1.JSON
+	// Version is the Service Operation version to install.
+	// This version is compared with ExternalSecretsOperator.Spec.Version to define available versions
+	// and the deployment artifacts of a version.
+	// +required
+	Version string `json:"version"`
+
+	// ChartVersion is the version of the Helm chart to install
+	// +required
+	ChartVersion string `json:"chartVersion"`
+
+	// ChartURL is a reference to an OCI artifact repository that hosts the external-secrets Helm chart.
+	// +optional
+	// +kubebuilder:default="oci://ghcr.io/external-secrets/charts/external-secrets"
+	ChartURL string `json:"chartURL,omitempty"`
+
+	// ChartPullSecret is a reference to the secret containing the credentials to pull the Helm chart.
+	// The secret must be of type kubernetes.io/dockerconfigjson.
+	// +optional
+	ChartPullSecret string `json:"chartPullSecret,omitempty"`
+
+	// HelmValues are arbitrary Helm values passed directly to the managed HelmRelease.
+	// +optional
+	HelmValues *apiextensionsv1.JSON `json:"helmValues,omitempty"`
 }
 
 // ManageFluxResources registers an OCIRepository and a HelmRelease as managed objects on the
