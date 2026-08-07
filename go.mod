@@ -18,7 +18,6 @@ require (
 	github.com/openmcp-project/controller-utils/api v0.31.0
 	github.com/openmcp-project/opencontrolplane-runtime v1.2.0
 	github.com/openmcp-project/openmcp-operator/api v1.3.0
-	github.com/openmcp-project/service-provider-external-secrets v1.1.1
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/zap v1.28.0
