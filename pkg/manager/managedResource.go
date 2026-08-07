@@ -9,7 +9,7 @@ type ManagedResource interface {
 	GetName() string
 	GetNamespace() *string // nil when the namespace is empty
 	GetLocation() ClusterType
-	GetStatus() Status
+	GetStatus() ManagedResourceStatus
 }
 
 // managedResourceResult is the package-private concrete implementation of ManagedResource
@@ -20,7 +20,7 @@ type managedResourceResult struct {
 	name       string
 	namespace  *string
 	location   ClusterType
-	status     Status
+	status     ManagedResourceStatus
 }
 
 func (r *managedResourceResult) GetAPIVersion() string    { return r.apiVersion }
@@ -28,4 +28,4 @@ func (r *managedResourceResult) GetKind() string          { return r.kind }
 func (r *managedResourceResult) GetName() string          { return r.name }
 func (r *managedResourceResult) GetNamespace() *string    { return r.namespace }
 func (r *managedResourceResult) GetLocation() ClusterType { return r.location }
-func (r *managedResourceResult) GetStatus() Status        { return r.status }
+func (r *managedResourceResult) GetStatus() ManagedResourceStatus { return r.status }

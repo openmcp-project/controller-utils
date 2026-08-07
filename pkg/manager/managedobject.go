@@ -19,8 +19,8 @@ const (
 // ReconcileFunc reconciles the given client.Object.
 type ReconcileFunc func(ctx context.Context, o client.Object) error
 
-// StatusFunc provides Status information for the given client.Object.
-type StatusFunc func(client.Object) Status
+// StatusFunc provides ManagedResourceStatus information for the given client.Object.
+type StatusFunc func(client.Object) ManagedResourceStatus
 
 // NoOp does not do anything with the provided object and returns nil.
 func NoOp(context.Context, client.Object) error {
@@ -56,7 +56,7 @@ type ManagedObject interface {
 	Reconcile(ctx context.Context) error
 	GetDependencies() []ManagedObject
 	GetDeletionPolicy() DeletionPolicy
-	GetStatus() Status
+	GetStatus() ManagedResourceStatus
 }
 
 var _ ManagedObject = &managedObject{}
@@ -93,11 +93,11 @@ func (m *managedObject) GetObject() client.Object {
 }
 
 // GetStatus implements ManagedObject.
-func (m *managedObject) GetStatus() Status {
+func (m *managedObject) GetStatus() ManagedResourceStatus {
 	if m.statusFunc != nil {
 		return m.statusFunc(m.object)
 	}
-	return Status{
+	return ManagedResourceStatus{
 		Phase:   StatusPhaseUnknown,
 		Message: "No status function defined.",
 	}

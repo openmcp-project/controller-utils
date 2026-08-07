@@ -187,22 +187,23 @@ func manageHelmRelease(p ManageFluxResourcesParams, dependants []manager.Managed
 }
 
 // FluxStatus indicates whether the given object is in phase terminating, pending or ready.
-func FluxStatus(o client.Object) manager.Status {
+func FluxStatus(o client.Object) manager.ManagedResourceStatus {
 	fluxObject := o.(conditions.Getter)
 	if !o.GetDeletionTimestamp().IsZero() {
-		return manager.Status{
+		return manager.ManagedResourceStatus{
 			Phase:   manager.StatusPhaseTerminating,
 			Message: "Resource is terminating.",
 		}
 	}
 	if conditions.IsTrue(fluxObject, meta.ReadyCondition) {
-		return manager.Status{
+		return manager.ManagedResourceStatus{
 			Phase:   manager.StatusPhaseReady,
 			Message: "Resource is ready",
 		}
 	}
-	return manager.Status{
-		Phase:   manager.StatusPhaseProgressing,
-		Message: "Resource is not ready",
+	msg := "Resource is not ready"
+	if cond := conditions.Get(fluxObject, meta.ReadyCondition); cond != nil && cond.Message != "" {
+		msg = cond.Message
 	}
+	return manager.ManagedResourceStatus{Phase: manager.StatusPhaseProgressing, Message: msg}
 }

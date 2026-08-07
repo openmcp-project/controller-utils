@@ -97,8 +97,8 @@ func (c *orphanCleaner[T]) deletionPrepared(obj client.Object) Result {
 	mo := &managedObject{
 		object:         obj,
 		deletionPolicy: Delete,
-		statusFunc: func(client.Object) Status {
-			return Status{Phase: StatusPhaseTerminating, Message: "Deletion prepared."}
+		statusFunc: func(client.Object) ManagedResourceStatus {
+			return ManagedResourceStatus{Phase: StatusPhaseTerminating, Message: "Deletion prepared."}
 		},
 	}
 	return Result{
@@ -112,8 +112,8 @@ func (c *orphanCleaner[T]) deletionError(obj client.Object, err error) Result {
 	mo := &managedObject{
 		object:         obj,
 		deletionPolicy: Delete,
-		statusFunc: func(client.Object) Status {
-			return Status{Phase: StatusPhaseTerminating, Message: "Deletion failed."}
+		statusFunc: func(client.Object) ManagedResourceStatus {
+			return ManagedResourceStatus{Phase: StatusPhaseTerminating, Message: "Deletion failed."}
 		},
 	}
 	return Result{
