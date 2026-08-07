@@ -42,7 +42,7 @@ func ExecApply(t *testing.T, clusters []ManagedCluster, expectedManagedObjects i
 	for _, cluster := range clusters {
 		mgr.AddCluster(cluster)
 	}
-	managedResources, err := mgr.Apply(context.TODO())
+	managedResources, _, err := mgr.Apply(context.TODO())
 	require.NoError(t, err)
 	return assertResult(t, managedResources, expectedManagedObjects, wantErrors)
 }

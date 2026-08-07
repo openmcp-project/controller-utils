@@ -36,10 +36,11 @@ type ManageFluxResourcesParams struct {
 	HelmReleaseName string
 }
 
-// RequestedVersion defines a version of Service Operator that can be installed
+// RequestedVersion defines a version of a Service Operator that can be installed.
+// +kubebuilder:object:generate=true
 type RequestedVersion struct {
 	// Version is the Service Operation version to install.
-	// This version is compared with ExternalSecretsOperator.Spec.Version to define available versions
+	// This version is compared with OperatorName.Spec.Version to define available versions
 	// and the deployment artifacts of a version.
 	// +required
 	Version string `json:"version"`
@@ -48,9 +49,8 @@ type RequestedVersion struct {
 	// +required
 	ChartVersion string `json:"chartVersion"`
 
-	// ChartURL is a reference to an OCI artifact repository that hosts the external-secrets Helm chart.
+	// ChartURL is a reference to an OCI artifact repository that hosts the Helm chart.
 	// +optional
-	// +kubebuilder:default="oci://ghcr.io/external-secrets/charts/external-secrets"
 	ChartURL string `json:"chartURL,omitempty"`
 
 	// ChartPullSecret is a reference to the secret containing the credentials to pull the Helm chart.
@@ -172,18 +172,18 @@ func FluxStatus(o client.Object) Status {
 	fluxObject := o.(conditions.Getter)
 	if !o.GetDeletionTimestamp().IsZero() {
 		return Status{
-			Phase:    StatusPhaseTerminating,
-			Message:  "Resource is terminating.",
+			Phase:   StatusPhaseTerminating,
+			Message: "Resource is terminating.",
 		}
 	}
 	if conditions.IsTrue(fluxObject, meta.ReadyCondition) {
 		return Status{
-			Phase:    StatusPhaseReady,
-			Message:  "Resource is ready",
+			Phase:   StatusPhaseReady,
+			Message: "Resource is ready",
 		}
 	}
 	return Status{
-		Phase:    StatusPhaseProgressing,
-		Message:  "Resource is not ready",
+		Phase:   StatusPhaseProgressing,
+		Message: "Resource is not ready",
 	}
 }

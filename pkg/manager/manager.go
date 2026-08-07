@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"slices"
 
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,14 +25,26 @@ const (
 	OperationResultOrphaned controllerutil.OperationResult = OperationResultDeleted
 )
 
+// ErrManagedResourcesFailed is returned by Apply/Delete when one or more
+// managed resources encountered a reconcile error.
+var ErrManagedResourcesFailed = errors.New("one or more managed resources failed")
+
 type dependents map[ManagedObject][]dependency
 
-// Manager manages the objects of an arbitrary number of clusters
+// Manager manages the objects of an arbitrary number of clusters.
 type Manager interface {
 	AddCluster(mc ManagedCluster)
 	AddCleaner(oc OrphanCleaner)
-	Apply(context.Context) (_ []ManagedResource, cleanup error)
-	Delete(context.Context) (_ []ManagedResource, cleanup error)
+	// Apply reconciles all managed objects in registration order.
+	// DependsOn is NOT used for apply ordering; it only affects deletion sequencing.
+	// Callers are responsible for registering objects in dependency order.
+	// done=true means every resource reached StatusPhaseReady.
+	// err wraps ErrManagedResourcesFailed when any individual reconcile failed.
+	Apply(ctx context.Context) (resources []ManagedResource, done bool, err error)
+	// Delete deletes all managed objects.
+	// done=true means every resource has been deleted or orphaned.
+	// err wraps ErrManagedResourcesFailed when any individual deletion failed.
+	Delete(ctx context.Context) (resources []ManagedResource, done bool, err error)
 }
 
 // OrphanCleaner removes any previously managed objects that are no longer part of the desired state.
@@ -47,16 +58,16 @@ type OrphanCleaner interface {
 func NewManager(serviceProvider string) Manager {
 	return &managerImpl{
 		serviceProvider: serviceProvider,
-		clusters:       []ManagedCluster{},
-		cleaners:       []OrphanCleaner{},
+		clusters:        []ManagedCluster{},
+		cleaners:        []OrphanCleaner{},
 	}
 }
 
 // managerImpl manages clusters and invokes reconciliation of ManagedObjects.
 type managerImpl struct {
 	serviceProvider string
-	clusters []ManagedCluster
-	cleaners []OrphanCleaner
+	clusters        []ManagedCluster
+	cleaners        []OrphanCleaner
 }
 
 // AddCluster adds a cluster to a Manager.
@@ -64,38 +75,30 @@ func (m *managerImpl) AddCluster(mc ManagedCluster) {
 	m.clusters = append(m.clusters, mc)
 }
 
-// Apply reconciles all managed objects in registration order.
-// DependsOn is NOT used for apply ordering; it only affects deletion sequencing.
-// Callers are responsible for registering objects in dependency order.
-func (m *managerImpl) Apply(ctx context.Context) ([]ManagedResource, error) {
+// Apply implements Manager.
+func (m *managerImpl) Apply(ctx context.Context) ([]ManagedResource, bool, error) {
 	results, err := m.reconcileObjects(ctx, false)
 	if err != nil {
-		return []ManagedResource{}, err
+		return nil, false, err
 	}
-	managedResources, resultContainsError := resultsToResources(ctx, results)
-	if resultContainsError {
-		return managedResources, err
+	resources, errs := resultsToResources(ctx, results)
+	if len(errs) > 0 {
+		return resources, false, fmt.Errorf("%w: %w", ErrManagedResourcesFailed, errors.Join(errs...))
 	}
-	if allResourcesReady(results) {
-		return managedResources, nil
-	}
-	return managedResources, nil
+	return resources, allResourcesReady(results), nil
 }
 
-// Delete invokes deletion of all ManagedObjects.
-func (m *managerImpl) Delete(ctx context.Context) ([]ManagedResource, error) {
+// Delete implements Manager.
+func (m *managerImpl) Delete(ctx context.Context) ([]ManagedResource, bool, error) {
 	results, err := m.reconcileObjects(ctx, true)
 	if err != nil {
-		return []ManagedResource{}, err
+		return nil, false, err
 	}
-	managedResources, resultContainsError := resultsToResources(ctx, results)
-	if resultContainsError {
-		return managedResources, err
+	resources, errs := resultsToResources(ctx, results)
+	if len(errs) > 0 {
+		return resources, false, fmt.Errorf("%w: %w", ErrManagedResourcesFailed, errors.Join(errs...))
 	}
-	if allDeleted(results) {
-		return managedResources, nil
-	}
-	return managedResources, nil
+	return resources, allDeleted(results), nil
 }
 
 // AddCleaner adds a cleaner to a Manager.
@@ -115,7 +118,7 @@ func (m *managerImpl) reconcileObjects(ctx context.Context, isDeletion bool) ([]
 		}
 	}
 
-	// remove any redundant resources like secret copies that are no longer part of the desired state.
+	// Remove any redundant resources like secret copies that are no longer part of the desired state.
 	for _, c := range m.cleaners {
 		result, err := c.Cleanup(ctx)
 		if err != nil {
@@ -128,7 +131,7 @@ func (m *managerImpl) reconcileObjects(ctx context.Context, isDeletion bool) ([]
 }
 
 func (m *managerImpl) reconcileObject(ctx context.Context, mc ManagedCluster, mo ManagedObject, dependents dependents, isDeletion bool) Result {
-	client := mc.GetClient()
+	cl := mc.GetClient()
 	obj := mo.GetObject()
 
 	if isDeletion {
@@ -146,17 +149,15 @@ func (m *managerImpl) reconcileObject(ctx context.Context, mc ManagedCluster, mo
 				Object:          mo,
 				Cluster:         mc,
 				OperationResult: OperationResultOrphaned,
-				Error:           nil,
 			}
 		}
 
-		err := client.Delete(ctx, obj)
+		err := cl.Delete(ctx, obj)
 		if apierrors.IsNotFound(err) {
 			return Result{
 				Object:          mo,
 				Cluster:         mc,
 				OperationResult: OperationResultDeleted,
-				Error:           nil,
 			}
 		}
 		return Result{
@@ -167,8 +168,8 @@ func (m *managerImpl) reconcileObject(ctx context.Context, mc ManagedCluster, mo
 		}
 	}
 
-	opResult, err := controllerutil.CreateOrUpdate(ctx, client, obj, func() error {
-		SetManagedBy(obj , m.serviceProvider)
+	opResult, err := controllerutil.CreateOrUpdate(ctx, cl, obj, func() error {
+		SetManagedBy(obj, m.serviceProvider)
 		return mo.Reconcile(ctx)
 	})
 	return Result{
@@ -180,21 +181,19 @@ func (m *managerImpl) reconcileObject(ctx context.Context, mc ManagedCluster, mo
 }
 
 func (m *managerImpl) checkForDependents(ctx context.Context, deps []dependency) error {
-	errs := []error{}
+	var errs []error
 	for _, dep := range deps {
 		obj := dep.Object.GetObject()
 		err := dep.Cluster.GetClient().Get(ctx, client.ObjectKeyFromObject(obj), obj)
 		if apierrors.IsNotFound(err) {
-			// "Not found" is the success case: The object which depends on us does not exist anymore.
+			// "Not found" is the success case: the dependent no longer exists.
 			continue
 		}
 		if err != nil {
-			// Some unexpected error occurred.
 			errs = append(errs, err)
 			continue
 		}
-		// No error occurred, the GET request has been successful.
-		// The object still exists and depends on us.
+		// No error: the GET succeeded, meaning the dependent still exists.
 		errs = append(errs, fmt.Errorf("dependent object still exists: %s", ObjectID(obj)))
 	}
 	return errors.Join(errs...)
@@ -231,46 +230,51 @@ type dependency struct {
 	Cluster ManagedCluster
 }
 
-// AllDeleted returns true if every item's operation result is OperationResultDeleted.
+// allDeleted returns true if every result is OperationResultDeleted or OperationResultOrphaned.
+// It uses OperationResult because deletion completion is an immediate API fact,
+// not a condition that needs to be polled from the object's status.
 func allDeleted(results []Result) bool {
 	for _, r := range results {
-		if r.OperationResult != OperationResultDeleted {
+		if r.OperationResult != OperationResultDeleted && r.OperationResult != OperationResultOrphaned {
 			return false
 		}
 	}
 	return true
 }
 
+// allResourcesReady returns true if every managed object has reached StatusPhaseReady.
+// It uses the object's StatusFunc output rather than OperationResult because convergence
+// (e.g. a Flux HelmRelease becoming ready) is asynchronous: OperationResult reflects
+// what the API server did ("created"/"updated"), not whether the controller has reconciled.
 func allResourcesReady(results []Result) bool {
 	for _, r := range results {
-		if r.OperationResult != StatusPhaseReady {
+		if r.Object.GetStatus().Phase != StatusPhaseReady {
 			return false
 		}
 	}
 	return true
 }
 
-func resultsToResources(ctx context.Context, results []Result) ([]ManagedResource, bool) {
+func resultsToResources(ctx context.Context, results []Result) ([]ManagedResource, []error) {
 	l := log.FromContext(ctx)
-	containsError := false
+	var errs []error
 	resources := make([]ManagedResource, 0, len(results))
 	for _, res := range results {
 		obj := res.Object.GetObject()
-		resources = append(resources, ManagedResource{
-			TypedObjectReference: corev1.TypedObjectReference{
-				Kind:      reflect.TypeOf(obj).Elem().Name(),
-				Name:      obj.GetName(),
-				Namespace: nilIfEmptyString(obj.GetNamespace()),
-			},
-			Status: res.Object.GetStatus(),
-			Location: res.Object.GetLocation(),
+		resources = append(resources, &managedResourceResult{
+			apiVersion: obj.GetObjectKind().GroupVersionKind().GroupVersion().String(),
+			kind:       reflect.TypeOf(obj).Elem().Name(),
+			name:       obj.GetName(),
+			namespace:  nilIfEmptyString(obj.GetNamespace()),
+			status:     res.Object.GetStatus(),
+			location:   res.Cluster.GetClusterType(),
 		})
 		if res.Error != nil {
-			containsError = true
-			l.Error(res.Error, "objectID", ObjectID(obj))
+			l.Error(res.Error, "reconcile error", "objectID", ObjectID(obj))
+			errs = append(errs, res.Error)
 		}
 	}
-	return resources, containsError
+	return resources, errs
 }
 
 func nilIfEmptyString(str string) *string {

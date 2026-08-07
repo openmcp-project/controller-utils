@@ -10,9 +10,9 @@ import (
 type DeletionPolicy string
 
 const (
-	// Orphan indicates that an object will be orphaned when deletion is requested
+	// Orphan indicates that an object will be orphaned when deletion is requested.
 	Orphan DeletionPolicy = "orphan"
-	// Delete indicates that an object will be deleted when deletion is requested
+	// Delete indicates that an object will be deleted when deletion is requested.
 	Delete DeletionPolicy = "delete"
 )
 
@@ -27,7 +27,7 @@ func NoOp(context.Context, client.Object) error {
 	return nil
 }
 
-// NewManagedObject creates a new ManagedObject instances to manage the given client.Object.
+// NewManagedObject creates a new ManagedObject instance to manage the given client.Object.
 func NewManagedObject(o client.Object, moc ManagedObjectContext) ManagedObject {
 	if moc.DeletionPolicy == "" {
 		moc.DeletionPolicy = Delete
@@ -39,7 +39,6 @@ func NewManagedObject(o client.Object, moc ManagedObjectContext) ManagedObject {
 		dependencies:   moc.DependsOn,
 		deletionPolicy: moc.DeletionPolicy,
 		statusFunc:     moc.StatusFunc,
-		managedBy:      moc.ManagedBy,
 	}
 }
 
@@ -48,21 +47,16 @@ type ManagedObjectContext struct {
 	ReconcileFunc  ReconcileFunc
 	DependsOn      []ManagedObject
 	DeletionPolicy DeletionPolicy
-	Status         Status
 	StatusFunc     StatusFunc
-	Location       ClusterType
-	ManagedBy      string
 }
 
-// ManagedObject represents an object managed by a Mana^ger.
+// ManagedObject represents an object managed by a Manager.
 type ManagedObject interface {
 	GetObject() client.Object
 	Reconcile(ctx context.Context) error
 	GetDependencies() []ManagedObject
 	GetDeletionPolicy() DeletionPolicy
-	GetLocation() ClusterType
 	GetStatus() Status
-	Label() string
 }
 
 var _ ManagedObject = &managedObject{}
@@ -72,19 +66,12 @@ type managedObject struct {
 	reconcileFunc  ReconcileFunc
 	dependencies   []ManagedObject
 	deletionPolicy DeletionPolicy
-	location       ClusterType
-	managedBy      string
 	statusFunc     StatusFunc
-	status         Status
 }
 
 // GetDeletionPolicy implements ManagedObject.
 func (m *managedObject) GetDeletionPolicy() DeletionPolicy {
 	return m.deletionPolicy
-}
-
-func (m *managedObject) GetLocation() ClusterType {
-	return m.location
 }
 
 // GetDependencies implements ManagedObject.
@@ -105,23 +92,13 @@ func (m *managedObject) GetObject() client.Object {
 	return m.object
 }
 
-// Label implements ManagedObject.
-func (m *managedObject) Label() string {
-	return m.managedBy
-}
-
 // GetStatus implements ManagedObject.
 func (m *managedObject) GetStatus() Status {
 	if m.statusFunc != nil {
 		return m.statusFunc(m.object)
 	}
 	return Status{
-		Phase:    StatusPhaseUnkown,
-		Message:  "No status function defined.",
+		Phase:   StatusPhaseUnknown,
+		Message: "No status function defined.",
 	}
-}
-
-// SetPhase sets the phase of the managedObject resource status
-func (m *managedObject) SetPhase(phase string) {
-	m.status.Phase = phase
 }

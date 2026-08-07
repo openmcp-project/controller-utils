@@ -1,33 +1,31 @@
 package manager
 
-import (
-	corev1 "k8s.io/api/core/v1"
-)
-
-type InstancePhase string
-
-// Constants representing the phases of an instance lifecycle.
-const (
-	Pending     InstancePhase = "Pending"
-	Progressing InstancePhase = "Progressing"
-	Ready       InstancePhase = "Ready"
-	Failed      InstancePhase = "Failed"
-	Terminating InstancePhase = "Terminating"
-	Unknown     InstancePhase = "Unknown"
-)
-
-// ManagedResource defines a kubernetes object with its lifecycle phase
-type ManagedResource struct {
-	corev1.TypedObjectReference `json:",inline"`
-
-	// +required
-	// Phase InstancePhase `json:"phase"`
-	// +optional
-	// Message string `json:"message,omitempty"`
-
-	// +required
-	Status Status `json:"status,omitempty"`
-	
-	// +optional
-	Location ClusterType `json:"location,omitempty"`
+// ManagedResource is the read-only view of a reconciled object returned by Apply and Delete.
+// It is an interface so pkg/manager stays decoupled from any CRD schema: consumers define
+// their own concrete CRD-embedded type and populate it from this interface.
+type ManagedResource interface {
+	GetAPIVersion() string
+	GetKind() string
+	GetName() string
+	GetNamespace() *string // nil when the namespace is empty
+	GetLocation() ClusterType
+	GetStatus() Status
 }
+
+// managedResourceResult is the package-private concrete implementation of ManagedResource
+// built inside resultsToResources. It never escapes pkg/manager.
+type managedResourceResult struct {
+	apiVersion string
+	kind       string
+	name       string
+	namespace  *string
+	location   ClusterType
+	status     Status
+}
+
+func (r *managedResourceResult) GetAPIVersion() string    { return r.apiVersion }
+func (r *managedResourceResult) GetKind() string          { return r.kind }
+func (r *managedResourceResult) GetName() string          { return r.name }
+func (r *managedResourceResult) GetNamespace() *string    { return r.namespace }
+func (r *managedResourceResult) GetLocation() ClusterType { return r.location }
+func (r *managedResourceResult) GetStatus() Status        { return r.status }

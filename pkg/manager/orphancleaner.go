@@ -97,8 +97,10 @@ func (c *orphanCleaner[T]) deletionPrepared(obj client.Object) Result {
 	mo := &managedObject{
 		object:         obj,
 		deletionPolicy: Delete,
+		statusFunc: func(client.Object) Status {
+			return Status{Phase: StatusPhaseTerminating, Message: "Deletion prepared."}
+		},
 	}
-
 	return Result{
 		Object:          mo,
 		Cluster:         c.cluster,
@@ -110,8 +112,10 @@ func (c *orphanCleaner[T]) deletionError(obj client.Object, err error) Result {
 	mo := &managedObject{
 		object:         obj,
 		deletionPolicy: Delete,
+		statusFunc: func(client.Object) Status {
+			return Status{Phase: StatusPhaseTerminating, Message: "Deletion failed."}
+		},
 	}
-	
 	return Result{
 		Object:          mo,
 		Cluster:         c.cluster,
