@@ -15,6 +15,8 @@ import (
 type SecretCopyConfig struct {
 	// SourceClient is the client to read the source secret from.
 	SourceClient client.Client
+	// SourceName is the name of the source secret.
+	SourceName string
 	// SourceNamespace is the namespace of the source secret.
 	SourceNamespace string
 	// TargetNamespace is the namespace of the target secret.
@@ -24,7 +26,7 @@ type SecretCopyConfig struct {
 }
 
 // ManagePullSecret syncs every image pull secret the to cluster
-func ManagePullSecret(targetCluster ManagedCluster, pullSecret corev1.LocalObjectReference, config SecretCopyConfig) {
+func ManagePullSecret(targetCluster ManagedCluster, config SecretCopyConfig) {
 	secret := NewManagedObject(&corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      config.TargetName,
@@ -38,7 +40,7 @@ func ManagePullSecret(targetCluster ManagedCluster, pullSecret corev1.LocalObjec
 			}
 			sourceSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      pullSecret.Name,
+					Name:      config.SourceName,
 					Namespace: config.SourceNamespace,
 				},
 			}

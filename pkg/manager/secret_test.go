@@ -46,15 +46,14 @@ func TestManagePullSecrets(t *testing.T) {
 		name string // description of this test case
 		// Named input parameters for target function.
 		targetCluster ManagedCluster
-		pullSecret    corev1.LocalObjectReference
 		config        SecretCopyConfig
 	}{
 		{
 			name:          "copy secret privateregcred from source to target namespace and adjust its name",
 			targetCluster: NewManagedCluster(fakeCluster, &rest.Config{}, sourceNamespace, PlatformCluster),
-			pullSecret:    corev1.LocalObjectReference{Name: secretName},
 			config: SecretCopyConfig{
 				SourceClient:    fakeCluster.Client(),
+				SourceName:      secretName,
 				SourceNamespace: sourceNamespace,
 				TargetNamespace: targetNamespace,
 				TargetName:      fmt.Sprintf("%s%s", "secretNamePrefix", secretName),
@@ -63,11 +62,11 @@ func TestManagePullSecrets(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ManagePullSecret(tt.targetCluster, tt.pullSecret, tt.config)
+			ManagePullSecret(tt.targetCluster, tt.config)
 			ExecApply(t, []ManagedCluster{tt.targetCluster}, 1, []string{})
 			sourceSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      tt.pullSecret.Name,
+					Name:      tt.config.SourceName,
 					Namespace: tt.config.SourceNamespace,
 				},
 			}
