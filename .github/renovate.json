@@ -1,0 +1,22 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>openmcp-project/.github:renovate-config"
+  ],
+  "git-submodules": {
+    "enabled": true
+  },
+  "minimumReleaseAge": "0 days",
+  "packageRules": [
+    {
+      "description": "Ignore version update for our own API",
+      "matchManagers": [
+        "gomod"
+      ],
+      "enabled": false,
+      "matchPackageNames": [
+        "github.com/openmcp-project/controller-utils/api"
+      ]
+    }
+  ]
+}
