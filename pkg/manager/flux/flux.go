@@ -90,15 +90,47 @@ type ManageFluxResourcesParams struct {
 // ManageFluxResources registers an OCIRepository and a HelmRelease as managed
 // objects on the cluster defined in p.Cluster. The objects are not reconciled
 // until the caller invokes Manager.Apply.
-func ManageFluxResources(p ManageFluxResourcesParams) {
-	ociRepo := manageOCIRepo(p, []manager.ManagedObject{})
+func ManageFluxResources(p ManageFluxResourcesParams) error {
+	if err := validateFluxResourcesParams(p); err != nil {
+		return err
+	}
+	ociRepo := manageOCIRepo(p)
 	p.Cluster.AddObject(ociRepo)
 
 	helmRelease := manageHelmRelease(p, []manager.ManagedObject{ociRepo})
 	p.Cluster.AddObject(helmRelease)
+	return nil
 }
 
-func manageOCIRepo(p ManageFluxResourcesParams, dependants []manager.ManagedObject) manager.ManagedObject {
+func validateFluxResourcesParams(p ManageFluxResourcesParams) error {
+	if p.Cluster == nil {
+		return fmt.Errorf("ManageFluxResourcesParams.Cluster must not be nil")
+	}
+	if p.RequestedVersion == nil {
+		return fmt.Errorf("ManageFluxResourcesParams.RequestedVersion must not be nil")
+	}
+	if p.RequestedVersion.GetChartURL() == "" {
+		return fmt.Errorf("ManageFluxResourcesParams.RequestedVersion.GetChartURL() must not be empty")
+	}
+	if p.ClusterContext.MCPAccessSecretKey.Name == "" {
+		return fmt.Errorf("ClusterContext.MCPAccessSecretKey.Name must not be empty")
+	}
+	if p.Interval <= 0 {
+		return fmt.Errorf("Interval must be greater than zero, got %v", p.Interval)
+	}
+	if p.OCIRepositoryName == "" {
+		return fmt.Errorf("ManageFluxResourcesParams.OCIRepositoryName must not be empty")
+	}
+	if p.HelmReleaseName == "" {
+		return fmt.Errorf("ManageFluxResourcesParams.HelmReleaseName must not be empty")
+	}
+	if p.MCPNamespace == "" {
+		return fmt.Errorf("ManageFluxResourcesParams.MCPNamespace must not be empty")
+	}
+	return nil
+}
+
+func manageOCIRepo(p ManageFluxResourcesParams) manager.ManagedObject {
 	return manager.NewManagedObject(&sourcev1.OCIRepository{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      p.OCIRepositoryName,
@@ -109,9 +141,6 @@ func manageOCIRepo(p ManageFluxResourcesParams, dependants []manager.ManagedObje
 			ociRepo, ok := o.(*sourcev1.OCIRepository)
 			if !ok {
 				return fmt.Errorf("expected *sourcev1.OCIRepository, got %T", o)
-			}
-			if p.RequestedVersion.GetChartURL() == "" {
-				return fmt.Errorf("missing ChartURL definition for version %s", p.RequestedVersion.GetVersion())
 			}
 			ociRepo.Spec = sourcev1.OCIRepositorySpec{
 				Interval: metav1.Duration{Duration: p.Interval},
@@ -134,13 +163,12 @@ func manageOCIRepo(p ManageFluxResourcesParams, dependants []manager.ManagedObje
 			}
 			return nil
 		},
-		DependsOn:      dependants,
 		DeletionPolicy: manager.Delete,
 		StatusFunc:     FluxStatus,
 	})
 }
 
-func manageHelmRelease(p ManageFluxResourcesParams, dependants []manager.ManagedObject) manager.ManagedObject {
+func manageHelmRelease(p ManageFluxResourcesParams, dependencies []manager.ManagedObject) manager.ManagedObject {
 	return manager.NewManagedObject(&helmv2.HelmRelease{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      p.HelmReleaseName,
@@ -171,6 +199,11 @@ func manageHelmRelease(p ManageFluxResourcesParams, dependants []manager.Managed
 					},
 					CreateNamespace: true,
 				},
+				Upgrade: &helmv2.Upgrade{
+					Remediation: &helmv2.UpgradeRemediation{
+						Retries: 3,
+					},
+				},
 				DriftDetection: &helmv2.DriftDetection{
 					Mode: helmv2.DriftDetectionEnabled,
 				},
@@ -180,7 +213,7 @@ func manageHelmRelease(p ManageFluxResourcesParams, dependants []manager.Managed
 			}
 			return nil
 		},
-		DependsOn:      dependants,
+		DependsOn:      dependencies,
 		DeletionPolicy: manager.Delete,
 		StatusFunc:     FluxStatus,
 	})
@@ -188,7 +221,13 @@ func manageHelmRelease(p ManageFluxResourcesParams, dependants []manager.Managed
 
 // FluxStatus indicates whether the given object is in phase terminating, pending or ready.
 func FluxStatus(o client.Object) manager.ManagedResourceStatus {
-	fluxObject := o.(conditions.Getter)
+	fluxObject, ok := o.(conditions.Getter)
+	if !ok {
+		return manager.ManagedResourceStatus{
+			Phase:   manager.StatusPhaseUnknown,
+			Message: fmt.Sprintf("object %T does not implement conditions.Getter", o),
+		}
+	}
 	if !o.GetDeletionTimestamp().IsZero() {
 		return manager.ManagedResourceStatus{
 			Phase:   manager.StatusPhaseTerminating,

@@ -29,7 +29,9 @@ func TestManagePullSecrets(t *testing.T) {
 		Data: map[string][]byte{
 			"test": []byte("testdata"),
 		},
-		Type: corev1.SecretTypeDockerConfigJson,
+		// Deliberately Opaque — NOT DockerConfigJson — to verify the mutator always
+		// sets the target type to DockerConfigJson regardless of the source type.
+		Type: corev1.SecretTypeOpaque,
 	}, &corev1.Secret{
 		// existing secret with the same source secret name in the target namespace
 		// this secret needs to be untouched by the service provider secret copy functionality
@@ -47,6 +49,7 @@ func TestManagePullSecrets(t *testing.T) {
 		// Named input parameters for target function.
 		targetCluster ManagedCluster
 		config        SecretCopyConfig
+		wantErr       bool
 	}{
 		{
 			name:          "copy secret privateregcred from source to target namespace and adjust its name",
@@ -58,12 +61,49 @@ func TestManagePullSecrets(t *testing.T) {
 				TargetNamespace: targetNamespace,
 				TargetName:      fmt.Sprintf("%s%s", "secretNamePrefix", secretName),
 			},
+			wantErr: false,
+		},
+		{
+			name:          "source secret not found — wrong name",
+			targetCluster: NewManagedCluster(fakeCluster, &rest.Config{}, sourceNamespace, PlatformCluster),
+			config: SecretCopyConfig{
+				SourceClient:    fakeCluster.Client(),
+				SourceName:      "wrongSecretName",
+				SourceNamespace: sourceNamespace,
+				TargetNamespace: targetNamespace,
+				TargetName:      fmt.Sprintf("%s%s", "secretNamePrefix", secretName),
+			},
+			wantErr: true,
+		},
+		{
+			name:          "source secret not found — wrong namespace",
+			targetCluster: NewManagedCluster(fakeCluster, &rest.Config{}, sourceNamespace, PlatformCluster),
+			config: SecretCopyConfig{
+				SourceClient:    fakeCluster.Client(),
+				SourceName:      secretName,
+				SourceNamespace: "wrongSourceNamespace",
+				TargetNamespace: targetNamespace,
+				TargetName:      fmt.Sprintf("%s%s", "secretNamePrefix", secretName),
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ManagePullSecret(tt.targetCluster, tt.config)
-			ExecApply(t, []ManagedCluster{tt.targetCluster}, 1, []string{})
+
+			mgr := NewManager("serviceprovider-test")
+			mgr.AddCluster(tt.targetCluster)
+			_, _, err := mgr.Apply(context.TODO())
+
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.ErrorIs(t, err, ErrManagedResourcesFailed)
+				return
+			}
+
+			require.NoError(t, err)
+
 			sourceSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      tt.config.SourceName,
@@ -82,6 +122,7 @@ func TestManagePullSecrets(t *testing.T) {
 					Namespace: tt.config.TargetNamespace,
 				},
 			}
+
 			require.NoError(t, tt.config.SourceClient.Get(context.TODO(), client.ObjectKeyFromObject(sourceSecret), sourceSecret))
 			require.NoError(t, tt.config.SourceClient.Get(context.TODO(), client.ObjectKeyFromObject(targetSecret), targetSecret))
 			require.NoError(t, tt.config.SourceClient.Get(context.TODO(), client.ObjectKeyFromObject(existingSecret), existingSecret))

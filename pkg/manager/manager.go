@@ -8,7 +8,6 @@ import (
 	"slices"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -127,6 +126,10 @@ func (m *managerImpl) reconcileObjects(ctx context.Context, isDeletion bool) ([]
 		results = slices.Concat(results, result)
 	}
 
+	if len(results) == 0 {
+		log.FromContext(ctx).V(1).Info("manager reconciled zero objects; no clusters or managed objects have been registered")
+	}
+
 	return results, nil
 }
 
@@ -160,11 +163,18 @@ func (m *managerImpl) reconcileObject(ctx context.Context, mc ManagedCluster, mo
 				OperationResult: OperationResultDeleted,
 			}
 		}
+		if err != nil {
+			return Result{
+				Object:          mo,
+				Cluster:         mc,
+				OperationResult: OperationResultDeletionFailed,
+				Error:           err,
+			}
+		}
 		return Result{
 			Object:          mo,
 			Cluster:         mc,
 			OperationResult: OperationResultDeletionRequested,
-			Error:           err,
 		}
 	}
 
@@ -261,11 +271,22 @@ func resultsToResources(ctx context.Context, results []Result) ([]ManagedResourc
 	resources := make([]ManagedResource, 0, len(results))
 	for _, res := range results {
 		obj := res.Object.GetObject()
+
+		apiGroup := ""
+		kind := reflect.TypeOf(obj).Elem().Name() // fallback: Go type name == Kind by convention
+		if gvk, err := res.Cluster.GetClient().GroupVersionKindFor(obj); err == nil {
+			apiGroup = gvk.Group
+			kind = gvk.Kind
+		} else {
+			l.Error(err, "cannot determine GVK for managed object; apiGroup will be empty in status", "objectID", ObjectID(obj))
+		}
+
 		resources = append(resources, &managedResourceResult{
-			apiVersion: obj.GetObjectKind().GroupVersionKind().GroupVersion().String(),
-			kind:       reflect.TypeOf(obj).Elem().Name(),
+			apiGroup:   apiGroup,
+			kind:       kind,
 			name:       obj.GetName(),
-			namespace:  nilIfEmptyString(obj.GetNamespace()),
+			namespace:  obj.GetNamespace(),
+			generation: obj.GetGeneration(),
 			status:     res.Object.GetStatus(),
 			location:   res.Cluster.GetClusterType(),
 		})
@@ -275,11 +296,4 @@ func resultsToResources(ctx context.Context, results []Result) ([]ManagedResourc
 		}
 	}
 	return resources, errs
-}
-
-func nilIfEmptyString(str string) *string {
-	if str == "" {
-		return nil
-	}
-	return ptr.To(str)
 }

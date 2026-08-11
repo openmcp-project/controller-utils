@@ -46,7 +46,7 @@ func ManagePullSecret(targetCluster ManagedCluster, config SecretCopyConfig) {
 			}
 			// retrieve source secret from platform cluster
 			if err := config.SourceClient.Get(ctx, client.ObjectKeyFromObject(sourceSecret), sourceSecret); err != nil {
-				return err
+				return fmt.Errorf("manage pull secret - source secret not found: %w", err)
 			}
 			mutator := openmcpresources.NewSecretMutator(config.TargetName, config.TargetNamespace, sourceSecret.Data, corev1.SecretTypeDockerConfigJson)
 			return mutator.Mutate(oSecret)
@@ -67,7 +67,7 @@ func PrefixSecretName(secretName string, prefix string) (string, error) {
 // NewSecretCleaner removes redundant pull secrets in the given target namespace
 // by removing any secret labeled as managed by sp-external-secrets that is not in secretsToKeep.
 func NewSecretCleaner(cluster ManagedCluster, serviceProvider string, namespace string, secretsToKeep []corev1.LocalObjectReference) OrphanCleaner {
-	return NewOrphanCleaner(cluster, serviceProvider, namespace, cleanerType[*corev1.SecretList]{
+	return NewOrphanCleaner(cluster, serviceProvider, namespace, CleanerType[*corev1.SecretList]{
 		EmptyList: func() *corev1.SecretList {
 			return &corev1.SecretList{}
 		},

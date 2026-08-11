@@ -21,10 +21,10 @@ type orphanCleaner[T client.ObjectList] struct {
 	cluster         ManagedCluster
 	serviceProvider string
 	namespace       string
-	cleanerType     cleanerType[T]
+	cleanerType     CleanerType[T]
 }
 
-type cleanerType[T client.ObjectList] struct {
+type CleanerType[T client.ObjectList] struct {
 	ObjectsToKeep []corev1.LocalObjectReference
 	EmptyList     func() T
 	// PreDeletionSteps is an optional hook that is invoked before OrphanCleaner.Cleanup deletes an object.
@@ -36,7 +36,7 @@ type cleanerType[T client.ObjectList] struct {
 }
 
 // NewOrphanCleaner removes redundant objects in the given target namespace.
-func NewOrphanCleaner[T client.ObjectList](cluster ManagedCluster, serviceProvider string, namespace string, clType cleanerType[T]) OrphanCleaner {
+func NewOrphanCleaner[T client.ObjectList](cluster ManagedCluster, serviceProvider string, namespace string, clType CleanerType[T]) OrphanCleaner {
 	return &orphanCleaner[T]{
 		cluster:         cluster,
 		serviceProvider: serviceProvider,
@@ -113,7 +113,10 @@ func (c *orphanCleaner[T]) deletionError(obj client.Object, err error) Result {
 		object:         obj,
 		deletionPolicy: Delete,
 		statusFunc: func(client.Object) ManagedResourceStatus {
-			return ManagedResourceStatus{Phase: StatusPhaseTerminating, Message: "Deletion failed."}
+			return ManagedResourceStatus{
+				Phase:   StatusPhaseProgressing,
+				Message: fmt.Sprintf("Deletion failed, retrying: %s", err.Error()),
+			}
 		},
 	}
 	return Result{

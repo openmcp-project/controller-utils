@@ -65,7 +65,7 @@ func (m *managedCluster) GetConfig() *rest.Config {
 
 // GetHostAndPort implements ManagedCluster.
 func (m *managedCluster) GetHostAndPort() (string, string) {
-	input := strings.TrimPrefix(m.cfg.Host, "https://")
+	input := strings.TrimPrefix(strings.TrimPrefix(m.cfg.Host, "https://"), "http://")
 	host, port, found := strings.Cut(input, ":")
 	if !found {
 		port = "443"

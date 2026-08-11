@@ -25,7 +25,7 @@ func Test_orphanCleaner_Cleanup(t *testing.T) {
 		name            string // description of this test case
 		targetNamespace string
 		cluster         ManagedCluster
-		cleanerType     cleanerType[*sourcev1.OCIRepositoryList]
+		cleanerType     CleanerType[*sourcev1.OCIRepositoryList]
 		want            []sourcev1.OCIRepository
 		wantErr         bool
 		wantResultErr   bool
@@ -126,7 +126,7 @@ func Test_orphanCleaner_Cleanup_prepareDeletion(t *testing.T) {
 		name            string // description of this test case
 		targetNamespace string
 		cluster         ManagedCluster
-		cleanerType     cleanerType[*sourcev1.OCIRepositoryList]
+		cleanerType     CleanerType[*sourcev1.OCIRepositoryList]
 		option          preparationOptions
 		want            []sourcev1.OCIRepository
 		wantErr         bool // expects orphan cleanup to return an error
@@ -183,7 +183,7 @@ func Test_orphanCleaner_Cleanup_prepareDeletion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			prepDeletionMock := prepareDeletionMock{}
-			var cleanerType cleanerType[*sourcev1.OCIRepositoryList]
+			var cleanerType CleanerType[*sourcev1.OCIRepositoryList]
 			switch tt.option {
 			case succeedAndDelete:
 				cleanerType = tt.cleanerType.withPreSteps(prepDeletionMock.successfulDelete)
@@ -225,8 +225,8 @@ func Test_orphanCleaner_Cleanup_prepareDeletion(t *testing.T) {
 
 var containsResultError = func(r Result) bool { return r.Error != nil }
 
-func createOCIRepoCleanerType(objectsToKeep ...corev1.LocalObjectReference) cleanerType[*sourcev1.OCIRepositoryList] {
-	return cleanerType[*sourcev1.OCIRepositoryList]{
+func createOCIRepoCleanerType(objectsToKeep ...corev1.LocalObjectReference) CleanerType[*sourcev1.OCIRepositoryList] {
+	return CleanerType[*sourcev1.OCIRepositoryList]{
 		EmptyList: func() *sourcev1.OCIRepositoryList {
 			return &sourcev1.OCIRepositoryList{}
 		},
@@ -266,7 +266,7 @@ func (p *prepareDeletionMock) failure(_ context.Context, _ client.Object) (bool,
 	return false, errors.New("delete prep failed")
 }
 
-func (r cleanerType[T]) withPreSteps(preSteps func(context.Context, client.Object) (bool, error)) cleanerType[T] {
+func (r CleanerType[T]) withPreSteps(preSteps func(context.Context, client.Object) (bool, error)) CleanerType[T] {
 	r.PreDeletionSteps = preSteps
 	return r
 }

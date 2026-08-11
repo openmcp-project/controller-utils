@@ -1,6 +1,7 @@
 package manager
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -38,5 +39,27 @@ func SimpleStatus(o client.Object) ManagedResourceStatus {
 	return ManagedResourceStatus{
 		Phase:   StatusPhaseReady,
 		Message: "Resource exists.",
+	}
+}
+
+// GetCondition synthesizes a Ready condition from the manager status.
+// observedGeneration must be set to the current metadata.generation of the
+// object being reconciled so consumers can determine whether the condition is stale.
+func (s *ManagedResourceStatus) GetCondition(observedGeneration int64) metav1.Condition {
+	condStatus := metav1.ConditionFalse
+	if s.Phase == StatusPhaseReady {
+		condStatus = metav1.ConditionTrue
+	}
+	reason := s.Phase
+	if reason == "" {
+		reason = "Unknown"
+	}
+
+	return metav1.Condition{
+		Type:               "Ready",
+		Status:             condStatus,
+		Reason:             reason,
+		Message:            s.Message,
+		ObservedGeneration: observedGeneration,
 	}
 }
