@@ -133,7 +133,7 @@ func TestApply_Done(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, resources, 1)
 		assert.False(t, done, "expected done=false when resource is Terminating")
-		assert.Equal(t, StatusPhaseTerminating, resources[0].GetStatus().Phase)
+		assert.Equal(t, StatusPhaseTerminating, resources[0].Status.Phase)
 	})
 }
 

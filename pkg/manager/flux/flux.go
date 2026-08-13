@@ -52,7 +52,7 @@ func NewFluxResourceVersion(
 }
 
 // fluxResourceVersion is the package-private concrete implementation of
-// FluxResourceVersion, analogous to managedResourceResult in pkg/manager.
+// FluxResourceVersion.
 type fluxResourceVersion struct {
 	version         string
 	chartVersion    string

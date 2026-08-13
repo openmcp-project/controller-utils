@@ -281,14 +281,13 @@ func resultsToResources(ctx context.Context, results []Result) ([]ManagedResourc
 			l.Error(err, "cannot determine GVK for managed object; apiGroup will be empty in status", "objectID", ObjectID(obj))
 		}
 
-		resources = append(resources, &managedResourceResult{
-			apiGroup:   apiGroup,
-			kind:       kind,
-			name:       obj.GetName(),
-			namespace:  obj.GetNamespace(),
-			generation: obj.GetGeneration(),
-			status:     res.Object.GetStatus(),
-			location:   res.Cluster.GetClusterType(),
+		resources = append(resources, ManagedResource{
+			APIGroup:  apiGroup,
+			Kind:      kind,
+			Name:      obj.GetName(),
+			Namespace: obj.GetNamespace(),
+			Status:    res.Object.GetStatus(),
+			Location:  res.Cluster.GetClusterType(),
 		})
 		if res.Error != nil {
 			l.Error(res.Error, "reconcile error", "objectID", ObjectID(obj))
