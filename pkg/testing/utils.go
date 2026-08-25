@@ -81,10 +81,56 @@ func LoadObject(obj any, paths ...string) error {
 	return yaml2.Unmarshal(objRaw, obj) // for some reason doesn't work with the other yaml library -.-
 }
 
+// LoadObjectsFromFile reads a single yaml file and returns all manifests within as `client.Object`.
+func LoadObjectsFromFile(p string, scheme *runtime.Scheme) ([]client.Object, error) {
+	res := []client.Object{}
+	objDecoder := serializer.NewCodecFactory(scheme).UniversalDeserializer()
+
+	reader, err := os.Open(p)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	yamlDecoder := yaml.NewDecoder(reader)
+
+	var obj runtime.Object
+	for {
+		var raw map[string]any
+		err = yamlDecoder.Decode(&raw)
+
+		if raw == nil {
+			break
+		}
+
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			} else {
+				return nil, err
+			}
+		}
+
+		var data []byte
+		data, err = yaml.Marshal(raw)
+		if err != nil {
+			return nil, err
+		}
+
+		into := &unstructured.Unstructured{}
+		obj, _, err = objDecoder.Decode(data, nil, into)
+		if err != nil {
+			return nil, err
+		}
+
+		res = append(res, obj.(client.Object))
+	}
+	return res, nil
+}
+
 // LoadObjects loads all Kubernetes manifests from the given path and returns them as `client.Object`.
 func LoadObjects(p string, scheme *runtime.Scheme) ([]client.Object, error) {
 	var objectList []client.Object
-	objDecoder := serializer.NewCodecFactory(scheme).UniversalDeserializer()
 
 	err := filepath.Walk(p, func(path string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
@@ -92,46 +138,12 @@ func LoadObjects(p string, scheme *runtime.Scheme) ([]client.Object, error) {
 		}
 
 		if !info.IsDir() && filepath.Ext(path) == ".yaml" {
-			reader, err := os.Open(path)
+			objs, err := LoadObjectsFromFile(path, scheme)
 			if err != nil {
 				return err
 			}
 
-			yamlDecoder := yaml.NewDecoder(reader)
-			if yamlDecoder == nil {
-				return errors.New("failed to create YAML decoder")
-			}
-
-			for {
-				var raw map[string]interface{}
-				err = yamlDecoder.Decode(&raw)
-
-				if raw == nil {
-					break
-				}
-
-				if err != nil {
-					if errors.Is(err, io.EOF) {
-						break
-					} else {
-						return err
-					}
-				}
-
-				var data []byte
-				data, err = yaml.Marshal(raw)
-				if err != nil {
-					return err
-				}
-
-				into := &unstructured.Unstructured{}
-				obj, _, err := objDecoder.Decode(data, nil, into)
-				if err != nil {
-					return err
-				}
-
-				objectList = append(objectList, obj.(client.Object))
-			}
+			objectList = append(objectList, objs...)
 		}
 
 		return nil
