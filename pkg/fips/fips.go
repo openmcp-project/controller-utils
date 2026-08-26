@@ -19,6 +19,8 @@ var fipsEnforced string
 func Verify(ctx context.Context) {
 	log, _ := logging.FromContextOrNew(ctx, nil)
 
+	log.Info("FIPS 140 verification started", "fipsEnforcedByBuild", fipsEnforced, "fips140.Enabled", fips140.Enabled())
+
 	if fipsEnforced != "true" {
 		return
 	}
