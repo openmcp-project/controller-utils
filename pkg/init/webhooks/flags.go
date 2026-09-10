@@ -39,9 +39,12 @@ func BindFlags(fs *flag.FlagSet) *Flags {
 	})
 
 	fs.Func("webhooks-service-port", "Port of the webhooks service (not the webhook server itself)", func(s string) error {
-		port, err := strconv.Atoi(s)
-		result.InstallOptions = append(result.InstallOptions, WithWebhookServicePort(port))
-		return err
+		parsedPort, err := strconv.ParseInt(s, 10, 32)
+		if err != nil {
+			return err
+		}
+		result.InstallOptions = append(result.InstallOptions, WithWebhookServicePort(int(parsedPort)))
+		return nil
 	})
 
 	fs.Func("webhooks-additional-sans", "Additional Subject Alternative Names (SANs) that should be added to the self-signed webhook certificate. Multiple domains can be specified as comma-separated values.", func(s string) error {
