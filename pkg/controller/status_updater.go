@@ -339,7 +339,7 @@ func GetField(obj any, field string, pointer bool) any {
 	if !ok {
 		val = reflect.ValueOf(obj)
 	}
-	for val.Kind() == reflect.Ptr || val.Kind() == reflect.Interface {
+	for val.Kind() == reflect.Pointer || val.Kind() == reflect.Interface {
 		val = val.Elem()
 	}
 	for i := range val.NumField() {
@@ -370,7 +370,7 @@ func SetField(obj any, field string, value any) {
 	if !ok {
 		val = reflect.ValueOf(obj)
 	}
-	for val.Kind() == reflect.Ptr || val.Kind() == reflect.Interface {
+	for val.Kind() == reflect.Pointer || val.Kind() == reflect.Interface {
 		val = val.Elem()
 	}
 	for i := range val.NumField() {
@@ -391,7 +391,7 @@ func SetField(obj any, field string, value any) {
 func IsSameObject[T any](a, b T) bool {
 	aVal := reflect.ValueOf(a)
 	bVal := reflect.ValueOf(b)
-	if aVal.Kind() != reflect.Ptr || bVal.Kind() != reflect.Ptr {
+	if aVal.Kind() != reflect.Pointer || bVal.Kind() != reflect.Pointer {
 		return false
 	}
 	if aVal.IsNil() && bVal.IsNil() {
