@@ -116,6 +116,23 @@ func (p metadataEntryChangedPredicate) Update(e event.UpdateEvent) bool {
 	return oldHasEntry != newHasEntry
 }
 
+type metadataValueChangedPredicate struct {
+	predicate.Funcs
+	mType metadataEntryType // type of metadata entry (annotation or label)
+	key   string            // key of the metadata entry
+}
+
+func (p metadataValueChangedPredicate) Update(e event.UpdateEvent) bool {
+	if e.ObjectOld == nil || e.ObjectNew == nil {
+		return false
+	}
+
+	oldValue, oldExists := getMetadataEntry(p.mType, e.ObjectOld, p.key)
+	newValue, newExists := getMetadataEntry(p.mType, e.ObjectNew, p.key)
+
+	return (oldExists != newExists) || (oldExists && newExists && oldValue != newValue)
+}
+
 // HasAnnotationPredicate reacts if the resource has the specified annotation.
 // If val is empty, the value of the annotation doesn't matter, only its existence.
 // Otherwise, true is only returned if the annotation has the specified value.
@@ -177,6 +194,24 @@ func LostLabelPredicate(key, val string) predicate.Predicate {
 		key:   key,
 		value: val,
 		mod:   -1,
+	}
+}
+
+// AnnotationValueChangedPredicate reacts if the value of the specified annotation changed.
+// The annotation being added or removed also counts as a change.
+func AnnotationValueChangedPredicate(key string) predicate.Predicate {
+	return metadataValueChangedPredicate{
+		mType: ANNOTATION,
+		key:   key,
+	}
+}
+
+// LabelValueChangedPredicate reacts if the value of the specified label changed.
+// The label being added or removed also counts as a change.
+func LabelValueChangedPredicate(key string) predicate.Predicate {
+	return metadataValueChangedPredicate{
+		mType: LABEL,
+		key:   key,
 	}
 }
 

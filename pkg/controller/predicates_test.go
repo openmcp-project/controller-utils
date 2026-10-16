@@ -7,7 +7,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
@@ -32,7 +31,7 @@ var _ = Describe("Predicates", func() {
 		It("should detect changes to the deletion timestamp", func() {
 			p := ctrlutils.DeletionTimestampChangedPredicate{}
 			Expect(p.Update(updateEvent(base, changed))).To(BeFalse(), "DeletionTimestampChangedPredicate should return false if the deletion timestamp did not change")
-			changed.SetDeletionTimestamp(ptr.To(metav1.Now()))
+			changed.SetDeletionTimestamp(new(metav1.Now()))
 			Expect(p.Update(updateEvent(base, changed))).To(BeTrue(), "DeletionTimestampChangedPredicate should return true if the deletion timestamp did change")
 		})
 
@@ -51,6 +50,8 @@ var _ = Describe("Predicates", func() {
 			pLostFoo := ctrlutils.LostAnnotationPredicate("foo", "")
 			pLostFooWithFoo := ctrlutils.LostAnnotationPredicate("foo", "foo")
 			pLostFooWithBar := ctrlutils.LostAnnotationPredicate("foo", "bar")
+			pFooValueChanged := ctrlutils.AnnotationValueChangedPredicate("foo")
+			pBarValueChanged := ctrlutils.AnnotationValueChangedPredicate("bar")
 			By("old and new resource are equal")
 			e := updateEvent(base, changed)
 			Expect(pHasFoo.Update(e)).To(BeFalse(), "HasAnnotationPredicate should return false if there are no annotations")
@@ -62,6 +63,8 @@ var _ = Describe("Predicates", func() {
 			Expect(pLostFoo.Update(e)).To(BeFalse(), "LostAnnotationPredicate should return false if there never were annotations")
 			Expect(pLostFooWithFoo.Update(e)).To(BeFalse(), "LostAnnotationPredicate should return false if there never were annotations")
 			Expect(pLostFooWithBar.Update(e)).To(BeFalse(), "LostAnnotationPredicate should return false if there never were annotations")
+			Expect(pFooValueChanged.Update(e)).To(BeFalse(), "AnnotationValueChangedPredicate should return false if the annotation value didn't change")
+			Expect(pBarValueChanged.Update(e)).To(BeFalse(), "AnnotationValueChangedPredicate should return false if the annotation value didn't change")
 			By("add annotation foo=foo")
 			changed.SetAnnotations(map[string]string{
 				"foo": "foo",
@@ -77,6 +80,8 @@ var _ = Describe("Predicates", func() {
 			Expect(pLostFoo.Update(e)).To(BeFalse(), "LostAnnotationPredicate should return false if the annotation wasn't there before")
 			Expect(pLostFooWithFoo.Update(e)).To(BeFalse(), "LostAnnotationPredicate should return false if the annotation wasn't there before")
 			Expect(pLostFooWithBar.Update(e)).To(BeFalse(), "LostAnnotationPredicate should return false if the annotation wasn't there before")
+			Expect(pFooValueChanged.Update(e)).To(BeTrue(), "AnnotationValueChangedPredicate should return true if the annotation was added")
+			Expect(pBarValueChanged.Update(e)).To(BeFalse(), "AnnotationValueChangedPredicate should return false if the annotation value didn't change")
 			By("change annotation to foo=bar")
 			base = changed.DeepCopy()
 			changed.SetAnnotations(map[string]string{
@@ -93,6 +98,8 @@ var _ = Describe("Predicates", func() {
 			Expect(pLostFoo.Update(e)).To(BeFalse(), "LostAnnotationPredicate should return false if the annotation was there before and is still there")
 			Expect(pLostFooWithFoo.Update(e)).To(BeTrue(), "LostAnnotationPredicate should return true if the annotation had the correct value before and it was changed")
 			Expect(pLostFooWithBar.Update(e)).To(BeFalse(), "LostAnnotationPredicate should return false if the annotation didn't have the correct value before")
+			Expect(pFooValueChanged.Update(e)).To(BeTrue(), "AnnotationValueChangedPredicate should return true if the annotation value changed")
+			Expect(pBarValueChanged.Update(e)).To(BeFalse(), "AnnotationValueChangedPredicate should return false if the annotation value didn't change")
 			By("remove annotation foo")
 			base = changed.DeepCopy()
 			changed.SetAnnotations(nil)
@@ -106,6 +113,8 @@ var _ = Describe("Predicates", func() {
 			Expect(pLostFoo.Update(e)).To(BeTrue(), "LostAnnotationPredicate should return true if the annotation was there before and got removed")
 			Expect(pLostFooWithFoo.Update(e)).To(BeFalse(), "LostAnnotationPredicate should return false if the annotation was removed but didn't have the correct value before")
 			Expect(pLostFooWithBar.Update(e)).To(BeTrue(), "LostAnnotationPredicate should return true if the annotation had the correct value before and was removed")
+			Expect(pFooValueChanged.Update(e)).To(BeTrue(), "AnnotationValueChangedPredicate should return true if the annotation got deleted")
+			Expect(pBarValueChanged.Update(e)).To(BeFalse(), "AnnotationValueChangedPredicate should return false if the annotation value didn't change")
 		})
 
 	})
@@ -139,6 +148,8 @@ var _ = Describe("Predicates", func() {
 			pLostFoo := ctrlutils.LostLabelPredicate("foo", "")
 			pLostFooWithFoo := ctrlutils.LostLabelPredicate("foo", "foo")
 			pLostFooWithBar := ctrlutils.LostLabelPredicate("foo", "bar")
+			pFooValueChanged := ctrlutils.LabelValueChangedPredicate("foo")
+			pBarValueChanged := ctrlutils.LabelValueChangedPredicate("bar")
 			By("old and new resource are equal")
 			e := updateEvent(base, changed)
 			Expect(matchesEverything.Update(e)).To(BeTrue(), "'everything' LabelSelector should always match")
@@ -154,6 +165,8 @@ var _ = Describe("Predicates", func() {
 			Expect(pLostFoo.Update(e)).To(BeFalse(), "LostLabelPredicate should return false if there never were labels")
 			Expect(pLostFooWithFoo.Update(e)).To(BeFalse(), "LostLabelPredicate should return false if there never were labels")
 			Expect(pLostFooWithBar.Update(e)).To(BeFalse(), "LostLabelPredicate should return false if there never were labels")
+			Expect(pFooValueChanged.Update(e)).To(BeFalse(), "LabelValueChangedPredicate should return false if the label value didn't change")
+			Expect(pBarValueChanged.Update(e)).To(BeFalse(), "LabelValueChangedPredicate should return false if the label value didn't change")
 			By("add label foo=foo")
 			changed.SetLabels(map[string]string{
 				"foo": "foo",
@@ -173,6 +186,8 @@ var _ = Describe("Predicates", func() {
 			Expect(pLostFoo.Update(e)).To(BeFalse(), "LostLabelPredicate should return false if the label wasn't there before")
 			Expect(pLostFooWithFoo.Update(e)).To(BeFalse(), "LostLabelPredicate should return false if the label wasn't there before")
 			Expect(pLostFooWithBar.Update(e)).To(BeFalse(), "LostLabelPredicate should return false if the label wasn't there before")
+			Expect(pFooValueChanged.Update(e)).To(BeTrue(), "LabelValueChangedPredicate should return true if the label was added")
+			Expect(pBarValueChanged.Update(e)).To(BeFalse(), "LabelValueChangedPredicate should return false if the label value didn't change")
 			By("change label to foo=bar")
 			base = changed.DeepCopy()
 			changed.SetLabels(map[string]string{
@@ -193,6 +208,8 @@ var _ = Describe("Predicates", func() {
 			Expect(pLostFoo.Update(e)).To(BeFalse(), "LostLabelPredicate should return false if the label was there before and is still there")
 			Expect(pLostFooWithFoo.Update(e)).To(BeTrue(), "LostLabelPredicate should return true if the label had the correct value before and it was changed")
 			Expect(pLostFooWithBar.Update(e)).To(BeFalse(), "LostLabelPredicate should return false if the label didn't have the correct value before")
+			Expect(pFooValueChanged.Update(e)).To(BeTrue(), "LabelValueChangedPredicate should return true if the label value changed")
+			Expect(pBarValueChanged.Update(e)).To(BeFalse(), "LabelValueChangedPredicate should return false if the label was not changed")
 			By("remove label foo")
 			base = changed.DeepCopy()
 			changed.SetLabels(nil)
@@ -210,6 +227,8 @@ var _ = Describe("Predicates", func() {
 			Expect(pLostFoo.Update(e)).To(BeTrue(), "LostLabelPredicate should return true if the label was there before and got removed")
 			Expect(pLostFooWithFoo.Update(e)).To(BeFalse(), "LostLabelPredicate should return false if the label was removed but didn't have the correct value before")
 			Expect(pLostFooWithBar.Update(e)).To(BeTrue(), "LostLabelPredicate should return true if the label had the correct value before and was removed")
+			Expect(pFooValueChanged.Update(e)).To(BeTrue(), "LabelValueChangedPredicate should return true if the label got deleted")
+			Expect(pBarValueChanged.Update(e)).To(BeFalse(), "LabelValueChangedPredicate should return false if the label value didn't change")
 		})
 
 	})
