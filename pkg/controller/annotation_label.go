@@ -139,7 +139,7 @@ func ensureMetadataEntry(mType metadataEntryType, ctx context.Context, c client.
 	mType.SetData(obj, data)
 	if patch {
 		// patch annotation/label to in-cluster object
-		if err := c.Patch(ctx, obj, client.RawPatch(types.MergePatchType, []byte(fmt.Sprintf(`{"metadata":{"%ss":{"%s":%s%s%s}}}`, mType.Name(), key, quote, value, quote)))); err != nil {
+		if err := c.Patch(ctx, obj, client.RawPatch(types.MergePatchType, fmt.Appendf(nil, `{"metadata":{"%ss":{"%s":%s%s%s}}}`, mType.Name(), key, quote, value, quote))); err != nil {
 			return err
 		}
 	}
