@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"sync"
 	"time"
 
 	"github.com/openmcp-project/controller-utils/pkg/logging"
@@ -15,17 +14,17 @@ const (
 )
 
 type periodicBuilder[Config any] struct {
-	interval          time.Duration
-	name              string
-	log               *logging.Logger
-	loggerAppendNames bool
-	runLogicFunc      func(ctx context.Context, p *PeriodicReadOnly[Config], cfg Config)
-	configFuncs       []func(ctx context.Context, cfg Config) (Config, error)
+	interval         time.Duration
+	name             string
+	log              *logging.Logger
+	loggerAppendName bool
+	runLogicFunc     RunLogicFunc[Config]
+	configFuncs      []func(ctx context.Context, cfg Config) (Config, error)
 }
 
 // NewPeriodicBuilder creates a builder for a new periodic instance.
 // Use the builder methods to configure it, then call Build() to create the periodic.
-func NewPeriodicBuilder[Config any](runLogicFunc func(ctx context.Context, p *PeriodicReadOnly[Config], cfg Config)) *periodicBuilder[Config] {
+func NewPeriodicBuilder[Config any](runLogicFunc RunLogicFunc[Config]) *periodicBuilder[Config] {
 	return (&periodicBuilder[Config]{}).
 		WithInterval(DefaultPeriodicInterval).
 		WithRunLogicFunc(runLogicFunc)
@@ -54,16 +53,17 @@ func (b *periodicBuilder[Config]) WithInterval(interval time.Duration) *periodic
 // Is set to a default logger, if not specified.
 func (b *periodicBuilder[Config]) WithLogger(log logging.Logger, appendNames bool) *periodicBuilder[Config] {
 	b.log = &log
-	b.loggerAppendNames = appendNames
+	b.loggerAppendName = appendNames
 	return b
 }
 
 // WithRunLogicFunc sets the function that holds the actual periodic logic.
 // It gets the following arguments:
-// - ctx: The current context.
-// - p: A read-only view of the periodic. Can be used to get the name or logger of the periodic, for example.
-// - cfg: If config getter functions have been configured, they are called to fetch the configuration at the beginning of the run. Otherwise, this is the zero value of Config.
-func (b *periodicBuilder[Config]) WithRunLogicFunc(runLogicFunc func(ctx context.Context, p *PeriodicReadOnly[Config], cfg Config)) *periodicBuilder[Config] {
+//   - ctx: The current context.
+//   - p: A handle to the periodic. Can be used to read or modify it, e.g. adjust the interval based on the loaded config.
+//     Must not be stored and used after the function returns.
+//   - cfg: If config getter functions have been configured, they are called to fetch the configuration at the beginning of the run. Otherwise, this is the zero value of Config.
+func (b *periodicBuilder[Config]) WithRunLogicFunc(runLogicFunc RunLogicFunc[Config]) *periodicBuilder[Config] {
 	b.runLogicFunc = runLogicFunc
 	return b
 }
@@ -85,7 +85,7 @@ func (b *periodicBuilder[Config]) WithDefaultLogger() *periodicBuilder[Config] {
 	return b
 }
 
-func (b *periodicBuilder[Config]) Build() (*Periodic[Config], error) {
+func (b *periodicBuilder[Config]) Build() (Periodic[Config], error) {
 	if b.runLogicFunc == nil {
 		return nil, fmt.Errorf("runLogicFunc must not be nil")
 	}
@@ -95,22 +95,19 @@ func (b *periodicBuilder[Config]) Build() (*Periodic[Config], error) {
 			return nil, fmt.Errorf("unable to construct default logger: %w", err)
 		}
 		b.log = &log
-		b.loggerAppendNames = true
+		b.loggerAppendName = true
 	}
-	if b.loggerAppendNames {
-		*b.log = b.log.WithName("Periodic")
-		if b.name != "" {
-			*b.log = b.log.WithName(b.name)
-		}
+	if b.loggerAppendName && b.name != "" {
+		*b.log = b.log.WithName(b.name)
 	}
-	return &Periodic[Config]{
-		lock:         sync.RWMutex{},
+	p := &periodic[Config]{
 		interval:     b.interval,
 		name:         b.name,
 		log:          *b.log,
-		trigger:      make(chan bool, 10), // buffered channel to avoid blocking if multiple triggers occur in quick succession
+		trigger:      make(chan bool, 10), // buffered to avoid blocking if multiple triggers arrive in quick succession
 		ticker:       time.NewTicker(b.interval),
 		configFuncs:  slices.Clone(b.configFuncs),
 		runLogicFunc: b.runLogicFunc,
-	}, nil
+	}
+	return &periodicSynced[Config]{p: p}, nil
 }
