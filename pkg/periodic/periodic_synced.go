@@ -91,7 +91,7 @@ func (s *periodicSynced[Config]) setNextRun(maybeInterval ...time.Duration) {
 		interval = maybeInterval[0]
 	}
 	s.p.ticker.Reset(interval)
-	s.p.log.Debug("Scheduling next run", "time", time.Now().Add(interval).Format(time.RFC3339))
+	s.p.log.Info("Scheduling next run", "time", time.Now().Add(interval).Format(time.RFC3339), "duration", interval)
 }
 
 func (s *periodicSynced[Config]) runLogic(ctx context.Context) {
