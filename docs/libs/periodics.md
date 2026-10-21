@@ -7,24 +7,27 @@ This was initially implemented as a library for garbage collectors, but has been
 
 Use the builder constructor to create a new periodic:
 ```go
-	periodic, err := periodic.NewPeriodicBuilder(func(ctx context.Context, p *periodic.PeriodicReadOnly[any], cfg any) {
-		// actual logic here
-	}).
-		WithInterval(1 * time.Hour).
-		Build()
+periodic, err := periodic.NewPeriodicBuilder(func(ctx context.Context, p periodic.Periodic[any], cfg any) {
+	// actual logic here
+}).
+	WithInterval(1 * time.Hour).
+	Build()
 ```
 
 The builder constructor takes a function as argument which implements the actual logic. It takes the following arguments:
 1. The current `context.Context`. Note that controller-runtime does not inject a logger into the context passed into non-controller runnables.
-2. A read-only view on the `Periodic`. It can be used to fetch the periodic's name, logger, last run time, and some other values, but all methods that actually modify the periodic are not available.
+2. A handle to the `Periodic` itself. This allows the logic to access information from the Periodic, such as its logger and the last run time, and to adjust it, e.g. the interval based on the loaded config. The handle must not be stored and used after the function returns — it will panic.
 3. The config, if one or more config functions were set in the builder. See below for a more detailed explanation.
 
 The periodic implements controller-runtime's `manager.Runnable` interface, which means that it can be passed into the manager to be run automatically:
 ```go
-if err := mgr.Add(gc); err != nil {
+if err := mgr.Add(periodic); err != nil {
   return fmt.Errorf("unable to add periodic to manager: %w", err)
 }
 ```
+
+> [!NOTE]
+> Periodics are thread-safe.
 
 ### Configuration
 
