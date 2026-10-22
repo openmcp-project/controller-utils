@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"os"
 
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
 	"github.com/openmcp-project/controller-utils/pkg/logging"
 )
 
@@ -16,8 +19,13 @@ var fipsEnforced string
 // Verify checks if the binary is built with FIPS compliance.
 // If yes, it checks if FIPS mode is enabled.
 // If it is not enabled but is expected to be enabled it exits the process.
-func Verify(ctx context.Context) {
-	log, _ := logging.FromContextOrNew(ctx, nil)
+// The context parameter is kept for compatibility.
+func Verify(_ context.Context) {
+	logConfig := logging.Config{}
+	logConfig.SetLogLevel(&zap.Config{
+		Level: zap.NewAtomicLevelAt(zapcore.InfoLevel),
+	})
+	log, _ := logging.New(&logConfig)
 
 	log.Info("FIPS 140 verification started", "fipsEnforcedByBuild", fipsEnforced, "fips140.Enabled", fips140.Enabled())
 
