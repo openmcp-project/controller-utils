@@ -6,9 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-
 	"github.com/openmcp-project/controller-utils/pkg/logging"
 )
 
