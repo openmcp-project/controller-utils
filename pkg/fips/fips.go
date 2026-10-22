@@ -21,11 +21,7 @@ var fipsEnforced string
 // If it is not enabled but is expected to be enabled it exits the process.
 // The context parameter is kept for compatibility.
 func Verify(_ context.Context) {
-	logConfig := logging.Config{}
-	logConfig.SetLogLevel(&zap.Config{
-		Level: zap.NewAtomicLevelAt(zapcore.InfoLevel),
-	})
-	log, _ := logging.New(&logConfig)
+	log, _ := logging.New(nil)
 
 	log.Info("FIPS 140 verification started", "fipsEnforcedByBuild", fipsEnforced, "fips140.Enabled", fips140.Enabled())
 
