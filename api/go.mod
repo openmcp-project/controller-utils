@@ -1,6 +1,6 @@
 module github.com/openmcp-project/controller-utils/api
 
-go 1.27.2
+go 1.27.3
 
 require github.com/fluxcd/pkg/apis/kustomize v1.23.0
 
