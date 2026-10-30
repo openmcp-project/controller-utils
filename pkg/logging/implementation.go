@@ -6,6 +6,7 @@ package logging
 
 import (
 	"github.com/go-logr/zapr"
+	"go.opentelemetry.io/contrib/bridges/otelzap"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -77,6 +78,15 @@ func New(config *Config) (Logger, error) {
 	zapLog, err := zapCfg.Build(zap.AddCallerSkip(1))
 	if err != nil {
 		return Logger{}, err
+	}
+	if logsExportConfigured() {
+		otelCore, err := zapcore.NewIncreaseLevelCore(otelzap.NewCore(instrumentationScope), zapCfg.Level)
+		if err != nil {
+			return Logger{}, err
+		}
+		zapLog = zapLog.WithOptions(zap.WrapCore(func(core zapcore.Core) zapcore.Core {
+			return zapcore.NewTee(core, otelCore)
+		}))
 	}
 	return Wrap(PreventKeyConflicts(zapr.NewLogger(zapLog))), nil
 }
