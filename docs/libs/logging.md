@@ -33,6 +33,5 @@ Set `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` (for exa
 
 `SetupLogs` installs a process-wide provider; the application owns its lifecycle. Configure the environment before creating loggers, call setup only once, and flush with a fresh, bounded context after stopping application work. The returned shutdown function is safe to call even when setup fails or export is disabled. Exported logs use `Resource()`, the SDK default resource, including `service.name` and `telemetry.sdk.*`; configure service identity with `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` before setup. Existing custom global providers are replaced only when export is enabled.
 
-Applications exposing Prometheus metrics can explicitly call `logging.RegisterSDKInfoMetric(registry)` to publish SDK identity on `target_info`. No metric is registered automatically. Collectors can promote the `telemetry_sdk_name`, `telemetry_sdk_language`, and `telemetry_sdk_version` labels to resource attributes. Repeated registration is supported; conflicting descriptors return an error.
 
 When exporting both stderr-collected logs and OTLP logs, configure collector-side deduplication. Collector deployment and operator chart configuration remain application responsibilities.

@@ -6,14 +6,11 @@ package logging
 
 import (
 	"context"
-	"errors"
 	"os"
 	"strings"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel"
 	otlploggrpc "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
-	"go.opentelemetry.io/otel/sdk"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/resource"
 )
@@ -28,26 +25,6 @@ var noopShutdown ShutdownFunc = func(context.Context) error { return nil }
 // Resource returns the SDK's process-wide default resource.
 func Resource() *resource.Resource {
 	return resource.Default()
-}
-
-// RegisterSDKInfoMetric exposes OTel SDK identity to Prometheus receivers via
-// the standard target_info series.
-func RegisterSDKInfoMetric(reg prometheus.Registerer) error {
-	info := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "target_info",
-		Help: "Telemetry SDK metadata for this scrape target.",
-		ConstLabels: prometheus.Labels{
-			"telemetry_sdk_name":     "opentelemetry",
-			"telemetry_sdk_language": "go",
-			"telemetry_sdk_version":  sdk.Version(),
-		},
-	})
-	info.Set(1)
-	var alreadyRegistered prometheus.AlreadyRegisteredError
-	if err := reg.Register(info); err != nil && !errors.As(err, &alreadyRegistered) {
-		return err
-	}
-	return nil
 }
 
 // SetupLogs enables OTLP/gRPC log export when standard OTel environment
