@@ -29,8 +29,8 @@ func BindFlags(fs *flag.FlagSet) *Flags {
 	})
 
 	fs.Func("crd-conversion-service-port", "Port of the CRD conversion webhook service (not the webhook server itself)", func(s string) error {
-		port, err := strconv.Atoi(s)
-		result.InstallOptions = append(result.InstallOptions, WithWebhookServicePort(port))
+		parsedPort, err := strconv.ParseInt(s, 10, 32)
+		result.InstallOptions = append(result.InstallOptions, WithWebhookServicePort(int32(parsedPort)))
 		return err
 	})
 
