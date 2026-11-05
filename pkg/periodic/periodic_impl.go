@@ -32,9 +32,7 @@ func (p *periodic[Config]) Enable() {
 	if p.disabled {
 		p.disabled = false
 		p.log.Info("Enabling periodic", "nextRunAt", p.nextRunTime())
-	}
-	if p.ticker == nil {
-		p.ticker = time.NewTicker(p.interval)
+		p.ticker.Reset(p.interval)
 	}
 }
 
@@ -42,10 +40,11 @@ func (p *periodic[Config]) Disable() {
 	if !p.disabled {
 		p.disabled = true
 		p.log.Info("Disabling periodic")
-	}
-	if p.ticker != nil {
 		p.ticker.Stop()
-		p.ticker = nil
+		// If a tick happened immediately before stopping, the signal might still be in the channel, so we drain it.
+		for len(p.ticker.C) > 0 {
+			<-p.ticker.C
+		}
 	}
 }
 
