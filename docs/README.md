@@ -14,6 +14,7 @@
 - [JSON Patch](libs/jsonpatch.md)
 - [Logging](libs/logging.md)
 - [Key-Value Pairs](libs/pairs.md)
+- [Periodics](libs/periodics.md)
 - [Readiness Checks](libs/readiness.md)
 - [Kubernetes Resource Management](libs/resource.md)
 - [Retrying k8s Operations](libs/retry.md)
